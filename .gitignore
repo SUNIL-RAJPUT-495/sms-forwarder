@@ -1,0 +1,29 @@
+# macOS / System Junk
+__MACOSX/
+.DS_Store
+Thumbs.db
+
+# Node.js & Dependencies
+node_modules/
+**/node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+firebase-debug.log
+firestore-debug.log
+*.log
+
+# Build & Output Folders
+build/
+**/build/
+.gradle/
+**/.gradle/
+.kotlin/
+**/.kotlin/
+.idea/
+**/.idea/
+
+# Local Data Files
+backend/data/*.json
+!backend/data/.gitkeep

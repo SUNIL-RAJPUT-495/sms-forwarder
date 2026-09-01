@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration
+
+    SECURITY: No cleartext traffic is permitted to any host.
+    All communication must use HTTPS/TLS.
+
+    We do NOT pin certificates in Phase 2. Certificate pinning
+    will be evaluated in Phase 8 (Security Hardening). The risk
+    of pinning: if Firebase rotates their certificate, the app
+    breaks silently. For a personal app, standard Android TLS
+    validation provides strong protection.
+
+    Firebase Functions domains: *.cloudfunctions.net
+    Firebase services: *.googleapis.com
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Allow cleartext only for localhost / local IP in debug/testing -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">192.168.29.68</domain>
+    </domain-config>
+</network-security-config>

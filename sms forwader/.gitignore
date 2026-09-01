@@ -1,0 +1,28 @@
+# Generated files
+.gradle/
+build/
+local.properties
+
+# Signing keys — NEVER commit these
+*.keystore
+*.jks
+keystore.properties
+
+# Firebase config — contains project IDs, not committed
+google-services.json
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Secrets
+.env
+.env.local
+secrets.properties
+
+# Node
+node_modules/
+dist/
+.firebase/
+firebase-debug.log

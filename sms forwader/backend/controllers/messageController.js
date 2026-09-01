@@ -1,0 +1,169 @@
+const Message = require('../models/Message');
+const Device = require('../models/Device');
+const { extractOTP } = require('../utils/otpExtractor');
+const { broadcastSSE } = require('../utils/sseManager');
+
+// Fallback JSON file storage
+const fs = require('fs');
+const path = require('path');
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
+const DEVICES_FILE = path.join(DATA_DIR, 'devices.json');
+
+function loadJSON(filePath, defaultValue = []) {
+  try {
+    if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (e) {}
+  return defaultValue;
+}
+function saveJSON(filePath, data) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+let fileMessages = loadJSON(MESSAGES_FILE, []);
+let fileDevices = loadJSON(DEVICES_FILE, []);
+
+/**
+ * Receive SMS / OTP from Department Phone
+ * POST /api/send-sms
+ */
+const sendSMS = async (req, res) => {
+  try {
+    const { deviceId, sender, body, timestamp } = req.body;
+
+    if (!body) {
+      return res.status(400).json({ error: "SMS body content is required" });
+    }
+
+    const now = new Date();
+    const detectedOtp = extractOTP(body);
+    const messageId = 'MSG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+
+    let deptName = req.body.departmentName || 'Unknown Dept';
+    let mobNo = req.body.mobileNumber || 'N/A';
+    let addr = req.body.address || 'Main Office';
+
+    // Try finding device in DB
+    try {
+      const device = await Device.findOne({ deviceId });
+      if (device) {
+        deptName = device.departmentName;
+        mobNo = device.mobileNumber;
+        addr = device.address;
+
+        device.lastSeen = now;
+        device.status = 'ONLINE';
+        device.messageCount = (device.messageCount || 0) + 1;
+        await device.save();
+      }
+    } catch (e) {
+      const fDev = fileDevices.find(d => d.deviceId === deviceId);
+      if (fDev) {
+        deptName = fDev.departmentName;
+        mobNo = fDev.mobileNumber;
+        addr = fDev.address;
+        fDev.lastSeen = now.toISOString();
+        fDev.status = 'ONLINE';
+        fDev.messageCount = (fDev.messageCount || 0) + 1;
+        saveJSON(DEVICES_FILE, fileDevices);
+      }
+    }
+
+    const messageData = {
+      messageId,
+      deviceId: deviceId || 'UNKNOWN',
+      departmentName: deptName,
+      mobileNumber: mobNo,
+      address: addr,
+      sender: sender || 'BANK-SMS',
+      body,
+      otp: detectedOtp,
+      timestamp: timestamp ? new Date(timestamp) : now,
+      receivedAt: now
+    };
+
+    // Save to MongoDB
+    try {
+      await Message.create(messageData);
+    } catch (dbErr) {
+      fileMessages.unshift({ ...messageData, id: messageId });
+      if (fileMessages.length > 1000) fileMessages = fileMessages.slice(0, 1000);
+      saveJSON(MESSAGES_FILE, fileMessages);
+    }
+
+    // Real-Time Broadcast
+    broadcastSSE('new_otp', { ...messageData, id: messageId });
+    broadcastSSE('device_ping', { deviceId, lastSeen: now });
+
+    console.log(`[SMS Received] Dept: ${deptName} | Sender: ${sender} | OTP: ${detectedOtp || 'None'}`);
+
+    return res.status(200).json({
+      success: true,
+      messageId,
+      otpDetected: !!detectedOtp,
+      otp: detectedOtp
+    });
+  } catch (error) {
+    console.error("sendSMS error:", error);
+    return res.status(500).json({ error: "Server Error" });
+  }
+};
+
+/**
+ * Get Message / OTP History
+ * GET /api/messages
+ */
+const getMessages = async (req, res) => {
+  try {
+    const { department, search, limit } = req.query;
+    const maxLimit = parseInt(limit, 10) || 100;
+    let list = [];
+
+    try {
+      let query = {};
+      if (department && department !== 'ALL') {
+        query.departmentName = { $regex: new RegExp(`^${department}$`, 'i') };
+      }
+      if (search) {
+        const qRegex = new RegExp(search, 'i');
+        query.$or = [
+          { body: qRegex },
+          { sender: qRegex },
+          { departmentName: qRegex },
+          { mobileNumber: qRegex },
+          { otp: qRegex }
+        ];
+      }
+      list = await Message.find(query).sort({ receivedAt: -1 }).limit(maxLimit).lean();
+      list = list.map(m => ({ ...m, id: m.messageId }));
+    } catch (dbErr) {
+      list = loadJSON(MESSAGES_FILE, []);
+      if (department && department !== 'ALL') {
+        list = list.filter(m => m.departmentName.toLowerCase() === department.toLowerCase());
+      }
+      if (search) {
+        const q = search.toLowerCase();
+        list = list.filter(m => 
+          m.body.toLowerCase().includes(q) ||
+          m.sender.toLowerCase().includes(q) ||
+          m.departmentName.toLowerCase().includes(q) ||
+          m.mobileNumber.toLowerCase().includes(q) ||
+          (m.otp && m.otp.includes(q))
+        );
+      }
+      list = list.slice(0, maxLimit);
+    }
+
+    return res.json(list);
+  } catch (error) {
+    return res.status(500).json({ error: "Server Error" });
+  }
+};
+
+module.exports = {
+  sendSMS,
+  getMessages
+};

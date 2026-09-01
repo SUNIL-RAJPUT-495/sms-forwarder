@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">SMS Forwarder (OPPO)</string>
+    <string name="notification_channel_service">Forwarding Service</string>
+    <string name="notification_channel_service_desc">Keeps SMS forwarding running in the background</string>
+    <string name="notification_service_title">SMS Forwarder Active</string>
+    <string name="notification_service_text">Monitoring for bank SMS to forward securely</string>
+</resources>

@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ============================================================
+         PERMISSIONS — OPPO (Source) App
+         Every permission is explained below.
+         ============================================================ -->
+
+    <!--
+        RECEIVE_SMS: Required to receive incoming SMS messages via
+        BroadcastReceiver. This is the core permission for this app's
+        entire purpose. Without it, SMS forwarding is impossible.
+        Risk: Sensitive — grants access to incoming SMS content.
+        Mitigation: Receiver is not exported; filtered to SMS_RECEIVED only.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+
+    <!--
+        INTERNET: Required to send encrypted messages to the backend
+        and receive FCM tokens for device registration.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        ACCESS_NETWORK_STATE: Check connectivity before attempting to
+        send. Used by WorkManager constraints and offline queue logic.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+        RECEIVE_BOOT_COMPLETED: Required to re-schedule WorkManager
+        jobs after a device reboot, ensuring pending encrypted messages
+        are retried and the SMS receiver is fully operational.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+        POST_NOTIFICATIONS: Required on Android 13+ (API 33+) to show
+        the foreground service notification. Without it the persistent
+        notification (which keeps the service alive on ColorOS) cannot
+        be displayed.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+        FOREGROUND_SERVICE: Required to start a foreground service.
+        The SMS forwarder runs as a foreground service with a visible
+        notification so ColorOS does not kill it in the background.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!--
+        FOREGROUND_SERVICE_SPECIAL_USE: Required on Android 14+ (API 34+)
+        for foreground services that don't fit a standard category.
+        Declared in the manifest; requires declaration in the service tag.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!--
+        REQUEST_IGNORE_BATTERY_OPTIMIZATIONS: Allows the app to direct
+        the user to the battery optimization exemption screen via an
+        intent. Does NOT grant exemption automatically — user must confirm.
+        Used in the Background Setup Guide screen.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!--
+        CAMERA: Optional — only used if the user chooses to scan a QR
+        code during pairing. The OPPO screen is broken, so this feature
+        may not be used, but we include it for flexibility.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!--
+        SCHEDULE_EXACT_ALARM: Used by WorkManager for precise retry
+        timing. Declared but only used if WorkManager requires it.
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!--
+        USE_BIOMETRIC: Optional — used for Keystore user-authentication
+        gates if biometric protection is enabled in settings.
+    -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!-- PERMISSIONS NOT REQUESTED AND WHY:
+         READ_SMS       — Not needed; we receive via broadcast, not content provider
+         READ_CONTACTS  — Not needed; we use sender IDs, not contact names
+         CAMERA         — Only if QR used; declared optional above
+         MICROPHONE     — Not needed
+         LOCATION       — Not needed
+         ACCESSIBILITY  — Not needed; we do not use accessibility services
+         DEVICE_ADMIN   — Not needed
+    -->
+
+    <application
+        android:name=".App"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SmsForwarderOppo"
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:targetApi="31">
+
+        <!-- Main Activity (Hidden from launcher/home screen) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SmsForwarderOppo">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- ============================================================
+             SMS BroadcastReceiver
+             - NOT exported: only the system can send SMS_RECEIVED
+             - android:permission ensures only the system (with
+               BROADCAST_SMS permission) can trigger this receiver
+             - Priority 999: processed before other apps where possible
+             ============================================================ -->
+        <receiver
+            android:name=".receiver.SmsBroadcastReceiver"
+            android:exported="false"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ============================================================
+             Boot Completed Receiver
+             - Reschedules WorkManager jobs and verifies the SMS receiver
+               is active after a device reboot.
+             ============================================================ -->
+        <receiver
+            android:name=".receiver.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ============================================================
+             Foreground Service — SMS Forwarder Service
+             - Keeps a persistent notification so ColorOS does not kill
+               the process during background operation.
+             - foregroundServiceType="specialUse" on API 34+
+             ============================================================ -->
+        <service
+            android:name=".service.SmsForwarderService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="SMS forwarding service for personal bank SMS relay" />
+        </service>
+
+        <!-- Firebase Messaging Service -->
+        <service
+            android:name=".service.OppoFcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- WorkManager initializer — disabled for manual initialization via Hilt -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
+    </application>
+
+</manifest>

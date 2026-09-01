@@ -1,0 +1,38 @@
+[
+  {
+    "id": "MSG-1788247800363-458",
+    "deviceId": "DEV-0CB41CF8354D",
+    "departmentName": "Abhishek",
+    "mobileNumber": "+91 98765 43210",
+    "address": "Floor 2, Room 201",
+    "sender": "HDFC-BANK",
+    "body": "Your OTP for transaction of Rs. 12,500 at Amazon is 948201. Valid for 10 mins.",
+    "otp": "948201",
+    "timestamp": "2026-09-01T07:29:59.404Z",
+    "receivedAt": "2026-09-01T07:30:00.363Z"
+  },
+  {
+    "id": "MSG-1788245274097-584",
+    "deviceId": "DEV-7C9AF37728AD",
+    "departmentName": "HR Department",
+    "mobileNumber": "+91 98765 33333",
+    "address": "Floor 3 - Cabin 4",
+    "sender": "ICICI-BANK",
+    "body": "Your OTP for transaction of Rs. 15,400 at Amazon is 839201. Valid for 10 mins. Do not share with anyone.",
+    "otp": "839201",
+    "timestamp": "2026-09-01T06:47:53.775Z",
+    "receivedAt": "2026-09-01T06:47:54.091Z"
+  },
+  {
+    "id": "MSG-1788245175787-218",
+    "deviceId": "DEV-7C9AF37728AD",
+    "departmentName": "HR Department",
+    "mobileNumber": "+91 98765 33333",
+    "address": "Floor 3 - Cabin 4",
+    "sender": "RAZORPAY",
+    "body": "Your OTP for transaction of Rs. 15,400 at Amazon is 492015. Valid for 10 mins. Do not share with anyone.",
+    "otp": "492015",
+    "timestamp": "2026-09-01T06:46:15.465Z",
+    "receivedAt": "2026-09-01T06:46:15.785Z"
+  }
+]
