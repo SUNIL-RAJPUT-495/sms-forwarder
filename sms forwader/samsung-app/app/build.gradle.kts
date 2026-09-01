@@ -25,7 +25,7 @@ android {
         }
 
         buildConfigField("String", "BACKEND_BASE_URL",
-            "\"https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net\"")
+            "\"https://smsai.ashtrinox.in/\"")
         buildConfigField("int", "PROTOCOL_VERSION", "1")
         // Reject messages older than this many minutes (replay protection)
         buildConfigField("long", "MAX_MESSAGE_AGE_MINUTES", "5L")
@@ -36,7 +36,7 @@ android {
             isDebuggable = true
             applicationIdSuffix = ".debug"
             buildConfigField("String", "BACKEND_BASE_URL",
-                "\"http://127.0.0.1:5001/sms-forwarder-backend/us-central1/\"")
+                "\"https://smsai.ashtrinox.in/\"")
         }
         release {
             isMinifyEnabled = true

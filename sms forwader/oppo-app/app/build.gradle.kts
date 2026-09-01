@@ -27,7 +27,7 @@ android {
         // Backend base URL — update this to your Firebase Functions URL
         // Format: https://<region>-<project-id>.cloudfunctions.net
         buildConfigField("String", "BACKEND_BASE_URL",
-            "\"https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net\"")
+            "\"https://smsai.ashtrinox.in/\"")
         buildConfigField("int", "PROTOCOL_VERSION", "1")
         buildConfigField("long", "MESSAGE_EXPIRY_HOURS", "24L")
         buildConfigField("int", "MAX_RETRY_ATTEMPTS", "10")
@@ -38,7 +38,7 @@ android {
             isDebuggable = true
             applicationIdSuffix = ".debug"
             buildConfigField("String", "BACKEND_BASE_URL",
-                "\"http://127.0.0.1:5001/sms-forwarder-backend/us-central1/\"")
+                "\"https://smsai.ashtrinox.in/\"")
         }
         release {
             isMinifyEnabled = true
