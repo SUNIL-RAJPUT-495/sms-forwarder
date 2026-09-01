@@ -1,13 +1,19 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const path = require('path');
-const connectDB = require('./config/db');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
-// Import Route Modules
-const deviceRoutes = require('./routes/deviceRoutes');
-const messageRoutes = require('./routes/messageRoutes');
+import connectDB from './config/db.js';
+import deviceRoutes from './routes/deviceRoutes.js';
+import messageRoutes from './routes/messageRoutes.js';
+import { registerDevice } from './controllers/deviceController.js';
+import { sendSMS } from './controllers/messageController.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,14 +31,12 @@ app.use('/api', deviceRoutes);
 app.use('/api', messageRoutes);
 
 // Legacy Root Endpoints Compatibility for Android App
-const { registerDevice } = require('./controllers/deviceController');
-const { sendSMS } = require('./controllers/messageController');
 app.post('/registerDevice', registerDevice);
 app.post('/sendMessage', sendSMS);
 
 // Serve Admin Panel Static UI
 const ADMIN_PANEL_PATH = path.join(__dirname, '..', 'admin-panel');
-if (require('fs').existsSync(ADMIN_PANEL_PATH)) {
+if (fs.existsSync(ADMIN_PANEL_PATH)) {
   app.use(express.static(ADMIN_PANEL_PATH));
 }
 
@@ -41,6 +45,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`====================================================`);
   console.log(`🚀 SMS Relay Enterprise Server Ready!`);
   console.log(`🌐 Web Dashboard: http://localhost:${PORT}`);
-  console.log(`🍃 Database Status: ${process.env.MONGODBURL ? 'MongoDB Active' : 'Local Fallback'}`);
+  console.log(`🍃 Database Status: MongoDB (Exclusive Data Source)`);
   console.log(`====================================================`);
 });
+

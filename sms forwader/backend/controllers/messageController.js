@@ -1,11 +1,15 @@
-const Message = require('../models/Message');
-const Device = require('../models/Device');
-const { extractOTP } = require('../utils/otpExtractor');
-const { broadcastSSE } = require('../utils/sseManager');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import Message from '../models/Message.js';
+import Device from '../models/Device.js';
+import { extractOTP } from '../utils/otpExtractor.js';
+import { broadcastSSE } from '../utils/sseManager.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Fallback JSON file storage
-const fs = require('fs');
-const path = require('path');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
 const DEVICES_FILE = path.join(DATA_DIR, 'devices.json');
@@ -16,6 +20,7 @@ function loadJSON(filePath, defaultValue = []) {
   } catch (e) {}
   return defaultValue;
 }
+
 function saveJSON(filePath, data) {
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -30,7 +35,7 @@ let fileDevices = loadJSON(DEVICES_FILE, []);
  * Receive SMS / OTP from Department Phone
  * POST /api/send-sms
  */
-const sendSMS = async (req, res) => {
+export const sendSMS = async (req, res) => {
   try {
     const { deviceId, sender, body, timestamp } = req.body;
 
@@ -85,7 +90,7 @@ const sendSMS = async (req, res) => {
       receivedAt: now
     };
 
-    // Save to MongoDB
+    // Save to MongoDB or Fallback JSON
     try {
       await Message.create(messageData);
     } catch (dbErr) {
@@ -116,7 +121,7 @@ const sendSMS = async (req, res) => {
  * Get Message / OTP History
  * GET /api/messages
  */
-const getMessages = async (req, res) => {
+export const getMessages = async (req, res) => {
   try {
     const { department, search, limit } = req.query;
     const maxLimit = parseInt(limit, 10) || 100;
@@ -146,7 +151,7 @@ const getMessages = async (req, res) => {
       }
       if (search) {
         const q = search.toLowerCase();
-        list = list.filter(m => 
+        list = list.filter(m =>
           m.body.toLowerCase().includes(q) ||
           m.sender.toLowerCase().includes(q) ||
           m.departmentName.toLowerCase().includes(q) ||
@@ -159,11 +164,12 @@ const getMessages = async (req, res) => {
 
     return res.json(list);
   } catch (error) {
+    console.error("getMessages error:", error);
     return res.status(500).json({ error: "Server Error" });
   }
 };
 
-module.exports = {
+export default {
   sendSMS,
   getMessages
 };

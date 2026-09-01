@@ -1,24 +1,23 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODBURL || process.env.MONGODB_URI;
     if (!mongoURI) {
-      console.warn("⚠️ Warning: MONGODBURL not found in .env. Falling back to local storage.");
-      return false;
+      console.warn("⚠️ MONGODBURL / MONGODB_URI not set in .env. Falling back to persistent file storage.");
+      return null;
     }
 
     const conn = await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 2000,
     });
 
     console.log(`🍃 MongoDB Connected: ${conn.connection.host}`);
-    return true;
+    return conn;
   } catch (error) {
-    console.error(`❌ MongoDB Connection Error: ${error.message}`);
-    console.warn(`⚠️ App will continue running with persistent fallback storage.`);
-    return false;
+    console.warn(`⚠️ MongoDB Connection Error (${error.message}). App will use persistent local storage fallback.`);
+    return null;
   }
 };
 
-module.exports = connectDB;
+export default connectDB;

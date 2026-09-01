@@ -5,8 +5,10 @@ import androidx.work.*
 import com.smsforwarder.app.crypto.UniversalCryptoEngine
 import com.smsforwarder.app.data.repository.DeviceRepository
 import com.smsforwarder.app.data.repository.MessageRepository
+import com.smsforwarder.app.domain.model.DeviceRole
 import com.smsforwarder.app.domain.model.SmsMessageData
 import com.smsforwarder.app.network.ApiService
+import com.smsforwarder.app.network.DirectSmsRequest
 import com.smsforwarder.app.worker.DrainQueueWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
@@ -38,18 +40,38 @@ class SmsForwardingPipeline @Inject constructor(
             return ForwardingResult.FilteredOut(eval.rejectionReason ?: "Filtered out")
         }
 
-        // 2. Check pairing state
         val deviceInfo = deviceRepository.deviceInfoFlow.first()
-        if (!deviceInfo.isPaired || deviceInfo.pairedDeviceId == null) {
-            return ForwardingResult.Error("Device is not paired with any destination receiver")
+
+        // Direct Relay mode for SENDER devices
+        if (deviceInfo.role == DeviceRole.SENDER || !deviceInfo.isPaired || deviceInfo.pairedDeviceId == null) {
+            val directRequest = DirectSmsRequest(
+                deviceId = deviceInfo.deviceId,
+                departmentName = deviceInfo.departmentName.ifBlank { deviceInfo.deviceName },
+                mobileNumber = deviceInfo.mobileNumber,
+                address = deviceInfo.address,
+                sender = sms.sender,
+                body = sms.body,
+                timestamp = sms.timestampMs.toString()
+            )
+            return try {
+                val response = apiService.sendDirectSms(directRequest)
+                if (response.isSuccessful) {
+                    ForwardingResult.Success(
+                        messageId = response.body()?.messageId ?: "MSG-${System.currentTimeMillis()}",
+                        matchedRule = eval.matchedRuleName ?: "Direct Relay"
+                    )
+                } else {
+                    ForwardingResult.Error("Server error: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                ForwardingResult.Error("Network error: ${e.localizedMessage}")
+            }
         }
 
+        // Encrypted P2P Relay mode for paired RECEIVER devices
         val destPublicKey = deviceRepository.getPairedPublicKey()
-        if (destPublicKey == null) {
-            return ForwardingResult.Error("No public key found for paired destination")
-        }
+            ?: return ForwardingResult.Error("No public key found for paired destination")
 
-        // 3. Encrypt payload
         val encryptedMessage = try {
             cryptoEngine.encryptOutboundMessage(
                 sms = sms,
@@ -61,7 +83,6 @@ class SmsForwardingPipeline @Inject constructor(
             return ForwardingResult.Error("Encryption failed: ${e.message}")
         }
 
-        // 4. Attempt immediate network send
         return try {
             val response = apiService.sendMessage(encryptedMessage)
             if (response.isSuccessful && response.body()?.accepted == true) {
@@ -70,7 +91,6 @@ class SmsForwardingPipeline @Inject constructor(
                     matchedRule = eval.matchedRuleName ?: "Rule match"
                 )
             } else {
-                // Queue for offline retry
                 messageRepository.queueOutboundMessage(
                     encryptedMessage,
                     "Server response ${response.code()}: ${response.message()}"
@@ -82,7 +102,6 @@ class SmsForwardingPipeline @Inject constructor(
                 )
             }
         } catch (e: Exception) {
-            // Network error — queue for retry
             messageRepository.queueOutboundMessage(encryptedMessage, e.message)
             scheduleQueueDrain()
             ForwardingResult.QueuedOffline(

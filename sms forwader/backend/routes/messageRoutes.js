@@ -1,10 +1,12 @@
-const express = require('express');
+import express from 'express';
+import { sendSMS, getMessages } from '../controllers/messageController.js';
+import { addClient } from '../utils/sseManager.js';
+
 const router = express.Router();
-const { sendSMS, getMessages } = require('../controllers/messageController');
-const { addClient } = require('../utils/sseManager');
 
 router.post('/send-sms', sendSMS);
 router.get('/messages', getMessages);
 router.get('/stream', addClient);
 
-module.exports = router;
+export default router;
+

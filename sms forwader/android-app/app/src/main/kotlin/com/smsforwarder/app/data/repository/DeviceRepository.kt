@@ -69,9 +69,12 @@ class DeviceRepository @Inject constructor(
     }
 
     val deviceInfoFlow: Flow<DeviceInfo> = context.deviceDataStore.data.map { prefs ->
-        val roleStr = prefs[KEY_DEVICE_ROLE] ?: DeviceRole.RECEIVER.name
-        val role = runCatching { DeviceRole.valueOf(roleStr) }.getOrDefault(DeviceRole.RECEIVER)
+        val roleStr = prefs[KEY_DEVICE_ROLE] ?: DeviceRole.SENDER.name
+        val role = runCatching { DeviceRole.valueOf(roleStr) }.getOrDefault(DeviceRole.SENDER)
         val name = prefs[KEY_DEVICE_NAME] ?: getDefaultDeviceName()
+        val departmentName = prefs[KEY_DEPARTMENT_NAME] ?: name
+        val mobileNumber = prefs[KEY_MOBILE_NUMBER] ?: ""
+        val address = prefs[KEY_ADDRESS] ?: ""
         val deviceId = prefs[KEY_DEVICE_ID] ?: ""
         val isRegistered = prefs[KEY_IS_REGISTERED] ?: false
         val isPaired = prefs[KEY_IS_PAIRED] ?: false
@@ -81,6 +84,9 @@ class DeviceRepository @Inject constructor(
         DeviceInfo(
             deviceId = deviceId,
             deviceName = name,
+            departmentName = departmentName,
+            mobileNumber = mobileNumber,
+            address = address,
             role = role,
             isRegistered = isRegistered,
             isPaired = isPaired,

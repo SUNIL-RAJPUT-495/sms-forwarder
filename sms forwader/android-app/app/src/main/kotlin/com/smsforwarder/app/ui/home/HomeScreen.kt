@@ -1,10 +1,14 @@
 package com.smsforwarder.app.ui.home
 
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,9 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.smsforwarder.app.domain.model.DeviceInfo
 import com.smsforwarder.app.domain.model.DeviceRole
 import com.smsforwarder.app.ui.theme.AccentGreen
 import com.smsforwarder.app.ui.theme.PrimaryBlue
@@ -35,6 +43,332 @@ fun HomeScreen(
     onNavigateModeSelection: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val deviceInfo = state.deviceInfo ?: return
+
+    // For Sender / Forwarder phone: Show simplified Form or "It is registered" screen
+    if (deviceInfo.role == DeviceRole.SENDER) {
+        if (!deviceInfo.isRegistered) {
+            SenderFormScreen(
+                isRegistering = state.isRegistering,
+                errorMessage = state.errorMessage,
+                defaultName = deviceInfo.deviceName,
+                onRegister = { name, mobile, address ->
+                    viewModel.registerSenderDevice(name, mobile, address)
+                }
+            )
+        } else {
+            SenderRegisteredScreen(info = deviceInfo)
+        }
+    } else {
+        // Full dashboard for Receiver / Dual client phone
+        FullDashboardScreen(
+            state = state,
+            viewModel = viewModel,
+            onNavigatePairing = onNavigatePairing,
+            onNavigateHistory = onNavigateHistory,
+            onNavigateFilters = onNavigateFilters,
+            onNavigateSettings = onNavigateSettings,
+            onNavigateBatteryGuide = onNavigateBatteryGuide,
+            onNavigateModeSelection = onNavigateModeSelection
+        )
+    }
+}
+
+/**
+ * Clean Form Screen for Sender / Forwarding phone registration.
+ */
+@Composable
+private fun SenderFormScreen(
+    isRegistering: Boolean,
+    errorMessage: String?,
+    defaultName: String,
+    onRegister: (name: String, mobile: String, address: String) -> Unit
+) {
+    var name by remember { mutableStateOf(defaultName) }
+    var mobileNumber by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SendToMobile,
+                    contentDescription = null,
+                    tint = PrimaryBlue,
+                    modifier = Modifier.size(56.dp)
+                )
+
+                Text(
+                    text = "SMS Forwarder Setup",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = "Fill in your details to register this phone for automatic SMS forwarding.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name / Department") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = mobileNumber,
+                    onValueChange = { mobileNumber = it },
+                    label = { Text("Mobile Number") },
+                    leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    label = { Text("Address") },
+                    leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                errorMessage?.let { err ->
+                    Text(
+                        text = err,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = { onRegister(name, mobileNumber, address) },
+                    enabled = !isRegistering && name.isNotBlank() && mobileNumber.isNotBlank(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isRegistering) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Registering...")
+                    } else {
+                        Text("Register Device", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Clean Screen shown after Sender Phone is registered: "It is registered" (No other options).
+ */
+@Composable
+private fun SenderRegisteredScreen(info: DeviceInfo) {
+    val context = LocalContext.current
+    var isNotificationListenerEnabled by remember {
+        mutableStateOf(checkNotificationListenerEnabled(context))
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = AccentGreen.copy(alpha = 0.15f),
+                modifier = Modifier.size(110.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = AccentGreen,
+                        modifier = Modifier.size(70.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = "It is registered",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "SMS Forwarder service is active in background",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    InfoRow(label = "Name / Dept", value = info.departmentName.ifBlank { info.deviceName })
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                    InfoRow(label = "Mobile No", value = info.mobileNumber.ifBlank { "N/A" })
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                    InfoRow(label = "Address", value = info.address.ifBlank { "Main Office" })
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Status",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "● Active & Forwarding",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = AccentGreen
+                        )
+                    }
+                }
+            }
+
+            if (!isNotificationListenerEnabled) {
+                OutlinedButton(
+                    onClick = {
+                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        isNotificationListenerEnabled = checkNotificationListenerEnabled(context)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = WarningAmber)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Enable Notification Access for App Alerts",
+                        color = WarningAmber,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = AccentGreen.copy(alpha = 0.12f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = AccentGreen, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Notification Access Enabled",
+                            color = AccentGreen,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun checkNotificationListenerEnabled(context: Context): Boolean {
+    val pkgName = context.packageName
+    val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+    return flat != null && flat.contains(pkgName)
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+/**
+ * Full Dashboard View for Receiver / Dual client.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FullDashboardScreen(
+    state: HomeUiState,
+    viewModel: HomeViewModel,
+    onNavigatePairing: () -> Unit,
+    onNavigateHistory: () -> Unit,
+    onNavigateFilters: () -> Unit,
+    onNavigateSettings: () -> Unit,
+    onNavigateBatteryGuide: () -> Unit,
+    onNavigateModeSelection: () -> Unit
+) {
     val scrollState = rememberScrollState()
 
     Scaffold(
@@ -67,7 +401,6 @@ fun HomeScreen(
         ) {
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 1. DEVICE IDENTITY & STATUS CARD
             state.deviceInfo?.let { info ->
                 DeviceStatusCard(
                     info = info,
@@ -77,7 +410,6 @@ fun HomeScreen(
                 )
             }
 
-            // 2. QUICK NAVIGATION TILES
             Text(
                 text = "Quick Actions",
                 style = MaterialTheme.typography.titleSmall,
@@ -131,7 +463,6 @@ fun HomeScreen(
                 )
             }
 
-            // 3. QUEUE & METRICS BANNER
             if (state.pendingQueueCount > 0) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = WarningAmber.copy(alpha = 0.15f)),
@@ -153,7 +484,6 @@ fun HomeScreen(
                 }
             }
 
-            // 4. TEST SMS SIMULATOR CARD
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
@@ -213,7 +543,7 @@ fun HomeScreen(
 
 @Composable
 private fun DeviceStatusCard(
-    info: com.smsforwarder.app.domain.model.DeviceInfo,
+    info: DeviceInfo,
     isRegistering: Boolean,
     onRegister: () -> Unit,
     onPair: () -> Unit
@@ -261,7 +591,7 @@ private fun DeviceStatusCard(
                 }
             }
 
-            Divider(modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
             if (!info.isRegistered) {
                 Text(

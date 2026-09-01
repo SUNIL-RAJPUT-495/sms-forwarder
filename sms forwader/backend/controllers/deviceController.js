@@ -1,10 +1,14 @@
-const crypto = require('crypto');
-const Device = require('../models/Device');
-const { broadcastSSE } = require('../utils/sseManager');
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import Device from '../models/Device.js';
+import { broadcastSSE } from '../utils/sseManager.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Fallback in-memory/file storage if MongoDB is unavailable
-const fs = require('fs');
-const path = require('path');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DEVICES_FILE = path.join(DATA_DIR, 'devices.json');
 
@@ -14,6 +18,7 @@ function loadJSON(filePath, defaultValue = []) {
   } catch (e) {}
   return defaultValue;
 }
+
 function saveJSON(filePath, data) {
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -27,7 +32,7 @@ let fileDevices = loadJSON(DEVICES_FILE, []);
  * Register or Update a Department Device
  * POST /api/register-device
  */
-const registerDevice = async (req, res) => {
+export const registerDevice = async (req, res) => {
   try {
     const { deviceName, departmentName, mobileNumber, address, role, publicKeyPem } = req.body;
 
@@ -72,7 +77,7 @@ const registerDevice = async (req, res) => {
         return res.status(201).json(newDevice);
       }
     } catch (dbErr) {
-      console.warn("Using JSON File Store for Device Registration:", dbErr.message);
+      console.warn("Using Local Persistent Storage for Device Registration:", dbErr.message);
       const existingIdx = fileDevices.findIndex(d => d.mobileNumber === mobileNumber && mobileNumber !== 'N/A');
       if (existingIdx !== -1) {
         fileDevices[existingIdx] = { ...fileDevices[existingIdx], ...deviceData, deviceId: fileDevices[existingIdx].deviceId };
@@ -95,7 +100,7 @@ const registerDevice = async (req, res) => {
  * Get all registered department phones
  * GET /api/devices
  */
-const getDevices = async (req, res) => {
+export const getDevices = async (req, res) => {
   try {
     const now = Date.now();
     let devicesList = [];
@@ -118,6 +123,7 @@ const getDevices = async (req, res) => {
 
     return res.json(formattedDevices);
   } catch (error) {
+    console.error("getDevices error:", error);
     return res.status(500).json({ error: "Server Error" });
   }
 };
@@ -126,7 +132,7 @@ const getDevices = async (req, res) => {
  * Device Heartbeat Ping
  * POST /api/devices/:id/heartbeat
  */
-const deviceHeartbeat = async (req, res) => {
+export const deviceHeartbeat = async (req, res) => {
   try {
     const { id } = req.params;
     const now = new Date();
@@ -154,6 +160,7 @@ const deviceHeartbeat = async (req, res) => {
 
     return res.status(404).json({ error: "Device not found" });
   } catch (error) {
+    console.error("deviceHeartbeat error:", error);
     return res.status(500).json({ error: "Server Error" });
   }
 };
@@ -162,7 +169,7 @@ const deviceHeartbeat = async (req, res) => {
  * Remove Device
  * DELETE /api/devices/:id
  */
-const deleteDevice = async (req, res) => {
+export const deleteDevice = async (req, res) => {
   try {
     const { id } = req.params;
     try {
@@ -175,11 +182,12 @@ const deleteDevice = async (req, res) => {
     broadcastSSE('device_deleted', { deviceId: id });
     return res.json({ success: true, message: "Device removed" });
   } catch (error) {
+    console.error("deleteDevice error:", error);
     return res.status(500).json({ error: "Server Error" });
   }
 };
 
-module.exports = {
+export default {
   registerDevice,
   getDevices,
   deviceHeartbeat,

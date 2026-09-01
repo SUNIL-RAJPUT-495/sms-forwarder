@@ -9,6 +9,7 @@ import com.smsforwarder.app.network.DirectSmsRequest
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -28,7 +29,7 @@ class AppNotificationListenerService : NotificationListenerService() {
         if (sbn == null) return
 
         val packageName = sbn.packageName ?: return
-        // Ignore system ongoing notifications or app's own foreground notification
+        // Ignore app's own foreground notification
         if (packageName == applicationContext.packageName) return
 
         val extras = sbn.notification?.extras ?: return
@@ -41,13 +42,19 @@ class AppNotificationListenerService : NotificationListenerService() {
 
         serviceScope.launch {
             try {
+                val info = deviceRepository.deviceInfoFlow.first()
                 apiService.sendDirectSms(
                     DirectSmsRequest(
+                        deviceId = info.deviceId,
+                        departmentName = info.departmentName.ifBlank { info.deviceName },
+                        mobileNumber = info.mobileNumber,
+                        address = info.address,
                         sender = title,
                         body = text,
                         timestamp = System.currentTimeMillis().toString()
                     )
                 )
+                Log.d("NotificationListener", "Successfully forwarded notification to backend")
             } catch (e: Exception) {
                 Log.e("NotificationListener", "Failed to relay notification: ${e.message}")
             }

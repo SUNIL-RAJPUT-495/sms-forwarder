@@ -105,6 +105,9 @@ enum class ForwardStatus {
 data class DeviceInfo(
     val deviceId: String,
     val deviceName: String,
+    val departmentName: String = "",
+    val mobileNumber: String = "",
+    val address: String = "",
     val role: DeviceRole,
     val isRegistered: Boolean,
     val isPaired: Boolean,

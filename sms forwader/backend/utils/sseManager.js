@@ -3,7 +3,7 @@
  */
 let sseClients = [];
 
-const addClient = (req, res) => {
+export const addClient = (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -20,12 +20,13 @@ const addClient = (req, res) => {
   });
 };
 
-const broadcastSSE = (event, data) => {
+export const broadcastSSE = (event, data) => {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   sseClients.forEach(client => client.res.write(payload));
 };
 
-module.exports = {
+export default {
   addClient,
   broadcastSSE
 };
+

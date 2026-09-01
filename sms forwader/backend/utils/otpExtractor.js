@@ -1,7 +1,7 @@
 /**
  * Utility function to extract 4-8 digit OTP from SMS content
  */
-function extractOTP(text) {
+export function extractOTP(text) {
   if (!text) return null;
   const otpPatterns = [
     /(?:otp|code|pin|verificati|is|paswd|password)[\s:]*([0-9]{4,8})/i,
@@ -17,4 +17,5 @@ function extractOTP(text) {
   return null;
 }
 
-module.exports = { extractOTP };
+export default { extractOTP };
+

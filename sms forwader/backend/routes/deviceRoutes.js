@@ -1,15 +1,17 @@
-const express = require('express');
-const router = express.Router();
-const {
+import express from 'express';
+import {
   registerDevice,
   getDevices,
   deviceHeartbeat,
   deleteDevice
-} = require('../controllers/deviceController');
+} from '../controllers/deviceController.js';
+
+const router = express.Router();
 
 router.post('/register-device', registerDevice);
 router.get('/devices', getDevices);
 router.post('/devices/:id/heartbeat', deviceHeartbeat);
 router.delete('/devices/:id', deleteDevice);
 
-module.exports = router;
+export default router;
+

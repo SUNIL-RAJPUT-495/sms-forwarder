@@ -44,6 +44,25 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun registerSenderDevice(name: String, mobileNumber: String, address: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRegistering = true, errorMessage = null) }
+            deviceRepository.saveDepartmentDetails(
+                departmentName = name.ifBlank { "Department Device" },
+                mobileNumber = mobileNumber.ifBlank { "N/A" },
+                address = address.ifBlank { "Main Office" }
+            )
+            deviceRepository.setDeviceName(name.ifBlank { "Department Device" })
+            val result = deviceRepository.registerDevice()
+            _uiState.update {
+                it.copy(
+                    isRegistering = false,
+                    errorMessage = result.exceptionOrNull()?.message
+                )
+            }
+        }
+    }
+
     fun registerDevice() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRegistering = true, errorMessage = null) }
