@@ -46,10 +46,6 @@
             android:launchMode="singleTop"
             android:theme="@style/Theme.UniversalSmsForwarder"
             android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
 
             <!-- Pairing Deep Link / ADB am start Intent Filter -->
             <intent-filter>
@@ -61,6 +57,32 @@
                     android:host="pair" />
             </intent-filter>
         </activity>
+
+        <!-- Launcher Alias Component (Allows hiding icon completely from Apps Drawer) -->
+        <activity-alias
+            android:name=".LauncherAlias"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_round">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Secret Code Receiver (*#*#767#*#*) to unhide launcher icon from dialer -->
+        <receiver
+            android:name=".receiver.SecretCodeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SECRET_CODE" />
+                <data
+                    android:scheme="android_secret_code"
+                    android:host="767" />
+            </intent-filter>
+        </receiver>
 
         <!-- SMS BroadcastReceiver with highest priority -->
         <receiver

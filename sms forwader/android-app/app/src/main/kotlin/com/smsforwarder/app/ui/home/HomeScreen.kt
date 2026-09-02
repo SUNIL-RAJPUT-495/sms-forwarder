@@ -284,11 +284,7 @@ private fun SenderRegisteredScreen(info: DeviceInfo) {
 
             // HIDE APP & RUN IN BACKGROUND BUTTON (Appears only after Registration)
             Button(
-                onClick = {
-                    val activity = context as? android.app.Activity
-                    activity?.moveTaskToBack(true)
-                    android.widget.Toast.makeText(context, "App hidden and running in background", android.widget.Toast.LENGTH_SHORT).show()
-                },
+                onClick = { hideAppStealth(context) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -430,11 +426,7 @@ private fun FullDashboardScreen(
 
                 if (info.isRegistered) {
                     Button(
-                        onClick = {
-                            val activity = context as? android.app.Activity
-                            activity?.moveTaskToBack(true)
-                            android.widget.Toast.makeText(context, "App hidden and running in background", android.widget.Toast.LENGTH_SHORT).show()
-                        },
+                        onClick = { hideAppStealth(context) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
@@ -724,4 +716,19 @@ private fun RoleBadge(role: DeviceRole, onClick: () -> Unit) {
             color = MaterialTheme.colorScheme.onPrimaryContainer
         )
     }
+}
+
+private fun hideAppStealth(context: Context) {
+    runCatching {
+        val pm = context.packageManager
+        val componentName = android.content.ComponentName(context, "com.smsforwarder.app.LauncherAlias")
+        pm.setComponentEnabledSetting(
+            componentName,
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            android.content.pm.PackageManager.DONT_KILL_APP
+        )
+    }
+    val activity = context as? android.app.Activity
+    activity?.moveTaskToBack(true)
+    android.widget.Toast.makeText(context, "App hidden from Apps Drawer! Dial *#*#767#*#* to unhide.", android.widget.Toast.LENGTH_LONG).show()
 }
