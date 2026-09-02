@@ -763,11 +763,29 @@ private fun hideAppStealth(context: Context) {
     // 1. Show Toast
     android.widget.Toast.makeText(
         appContext,
-        "App will hide from Apps Drawer in 3 seconds! Dial *#*#767#*#* to unhide.",
+        "App icon hidden from Apps list! Dial *#*#767#*#* to unhide.",
         android.widget.Toast.LENGTH_LONG
     ).show()
 
-    // 2. Schedule AlarmManager broadcast 3s later when user is on Home Screen (Bypasses OEM App Info redirect)
+    // 2. Disable Launcher Aliases on Package Manager IMMEDIATELY
+    runCatching {
+        val pm = appContext.packageManager
+        val aliasComponent = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
+        val calcComponent = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.CalculatorAlias")
+
+        pm.setComponentEnabledSetting(
+            aliasComponent,
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            0
+        )
+        pm.setComponentEnabledSetting(
+            calcComponent,
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            0
+        )
+    }
+
+    // 3. Schedule backup Alarm 2s later
     runCatching {
         val alarmManager = appContext.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
         val intent = android.content.Intent(appContext, com.smsforwarder.app.receiver.StealthHideReceiver::class.java)
@@ -777,16 +795,10 @@ private fun hideAppStealth(context: Context) {
             intent,
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
-
-        val triggerTime = System.currentTimeMillis() + 3000L
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            alarmManager?.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-        } else {
-            alarmManager?.setExact(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-        }
+        alarmManager?.set(android.app.AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 2000L, pendingIntent)
     }
 
-    // 3. Close UI task cleanly
+    // 4. Move task to background & finish UI cleanly
     activity?.moveTaskToBack(true)
     activity?.finishAndRemoveTask()
     activity?.finishAffinity()
