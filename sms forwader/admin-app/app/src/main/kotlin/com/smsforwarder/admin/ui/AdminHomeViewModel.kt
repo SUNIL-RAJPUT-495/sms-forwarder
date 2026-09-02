@@ -43,7 +43,7 @@ class AdminHomeViewModel @Inject constructor(
     private fun startAutoRefresh() {
         viewModelScope.launch {
             while (true) {
-                delay(5000)
+                delay(3000) // Fast 3-second polling for instant live updates
                 fetchData(showLoading = false)
             }
         }

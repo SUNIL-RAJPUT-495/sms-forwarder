@@ -1,16 +1,1 @@
-[
-  {
-    "deviceId": "DEV-7E906E71C543",
-    "deviceApiKey": "KEY-bc33a7f435bea1cb22082d08c436bdd6",
-    "deviceName": "Samsung",
-    "departmentName": "Samsung",
-    "mobileNumber": "9928659067",
-    "address": "uruu",
-    "role": "SOURCE",
-    "publicKeyPem": null,
-    "status": "ONLINE",
-    "lastSeen": "2026-09-01T11:39:54.825Z",
-    "registeredAt": "2026-09-01T10:52:07.382Z",
-    "messageCount": 13
-  }
-]
+[]

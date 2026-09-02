@@ -74,11 +74,7 @@ fun AdminHomeScreen(
                 .padding(horizontal = 16.dp)
         ) {
             // Live Status & Stat Cards Header
-            StatsHeaderCard(
-                state = state,
-                onAddDemoUser = { viewModel.simulateDemoDevice() },
-                onTestNotification = { viewModel.simulateTestSms() }
-            )
+            StatsHeaderCard(state = state)
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -151,9 +147,7 @@ fun AdminHomeScreen(
 
 @Composable
 private fun StatsHeaderCard(
-    state: AdminHomeUiState,
-    onAddDemoUser: () -> Unit,
-    onTestNotification: () -> Unit
+    state: AdminHomeUiState
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -180,26 +174,6 @@ private fun StatsHeaderCard(
                         fontWeight = FontWeight.Bold,
                         color = if (state.errorMessage == null) AccentGreen else WarningAmber
                     )
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = onAddDemoUser,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("+ Demo User", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    Button(
-                        onClick = onTestNotification,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("🧪 Test SMS", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
                 }
             }
 
