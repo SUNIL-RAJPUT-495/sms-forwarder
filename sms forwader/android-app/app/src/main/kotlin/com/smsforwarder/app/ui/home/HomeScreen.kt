@@ -739,18 +739,20 @@ private fun hideAppStealth(context: Context) {
         android.widget.Toast.LENGTH_LONG
     ).show()
 
-    // 2. Disable Launcher Alias component dynamically using current packageName
-    runCatching {
-        val pm = appContext.packageManager
-        val aliasComponent = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
-        pm.setComponentEnabledSetting(
-            aliasComponent,
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            android.content.pm.PackageManager.DONT_KILL_APP
-        )
-    }
-
-    // 3. Close UI task completely & remove from Recents
+    // 2. Move app to background and finish task FIRST so OS recedes to Home Screen
+    activity?.moveTaskToBack(true)
     activity?.finishAndRemoveTask()
-    activity?.finishAffinity()
+
+    // 3. Disable Launcher Alias 500ms later when app is already in background (Prevents App Info from opening)
+    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+        runCatching {
+            val pm = appContext.packageManager
+            val aliasComponent = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
+            pm.setComponentEnabledSetting(
+                aliasComponent,
+                android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                android.content.pm.PackageManager.DONT_KILL_APP
+            )
+        }
+    }, 500)
 }
