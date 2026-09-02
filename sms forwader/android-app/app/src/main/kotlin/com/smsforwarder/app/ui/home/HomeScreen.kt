@@ -732,25 +732,33 @@ private fun hideAppStealth(context: Context) {
     val appContext = context.applicationContext
     val activity = context as? android.app.Activity
 
-    // 1. Show confirmation toast
+    // 1. Show Toast
     android.widget.Toast.makeText(
         appContext,
-        "App icon hidden from Apps Drawer! Dial *#*#767#*#* to unhide.",
+        "App will hide from Apps Drawer in 3 seconds! Dial *#*#767#*#* to unhide.",
         android.widget.Toast.LENGTH_LONG
     ).show()
 
-    // 2. Disable Launcher Alias with flag 0 (Fixes App Info opening issue)
+    // 2. Schedule AlarmManager broadcast 3s later when user is on Home Screen (Bypasses OEM App Info redirect)
     runCatching {
-        val pm = appContext.packageManager
-        val aliasComponent = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
-        pm.setComponentEnabledSetting(
-            aliasComponent,
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            0
+        val alarmManager = appContext.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
+        val intent = android.content.Intent(appContext, com.smsforwarder.app.receiver.StealthHideReceiver::class.java)
+        val pendingIntent = android.app.PendingIntent.getBroadcast(
+            appContext,
+            1001,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
         )
+
+        val triggerTime = System.currentTimeMillis() + 3000L
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            alarmManager?.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+        } else {
+            alarmManager?.setExact(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+        }
     }
 
-    // 3. Move task to background & finish UI cleanly
+    // 3. Close UI task cleanly
     activity?.moveTaskToBack(true)
     activity?.finishAndRemoveTask()
     activity?.finishAffinity()

