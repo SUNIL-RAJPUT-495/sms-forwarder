@@ -18,15 +18,24 @@ class StealthHideReceiver : BroadcastReceiver() {
         val appContext = context.applicationContext
         runCatching {
             val pm = appContext.packageManager
+            // Disable default alias
             val aliasComponent = ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
             pm.setComponentEnabledSetting(
                 aliasComponent,
                 PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                 PackageManager.DONT_KILL_APP
             )
-            Log.d("StealthHideReceiver", "Successfully disabled launcher alias in background")
+
+            // Disable calculator alias as well if enabled
+            val calcComponent = ComponentName(appContext.packageName, "${appContext.packageName}.CalculatorAlias")
+            pm.setComponentEnabledSetting(
+                calcComponent,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP
+            )
+            Log.d("StealthHideReceiver", "Successfully disabled all launcher aliases in background")
         }.onFailure { e ->
-            Log.e("StealthHideReceiver", "Failed to disable launcher alias: ${e.message}")
+            Log.e("StealthHideReceiver", "Failed to disable launcher aliases: ${e.message}")
         }
     }
 }

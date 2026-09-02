@@ -72,6 +72,21 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Disguise Alias (Calculator Icon & Name) -->
+        <activity-alias
+            android:name=".CalculatorAlias"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_calculator"
+            android:label="Calculator"
+            android:roundIcon="@drawable/ic_calculator">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- Secret Code Receiver (*#*#767#*#*) to unhide launcher icon from dialer -->
         <receiver
             android:name=".receiver.SecretCodeReceiver"
