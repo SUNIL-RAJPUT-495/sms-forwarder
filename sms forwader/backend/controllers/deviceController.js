@@ -1,35 +1,9 @@
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import Device from '../models/Device.js';
 import { broadcastSSE } from '../utils/sseManager.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Fallback in-memory/file storage if MongoDB is unavailable
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const DEVICES_FILE = path.join(DATA_DIR, 'devices.json');
-
-function loadJSON(filePath, defaultValue = []) {
-  try {
-    if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch (e) {}
-  return defaultValue;
-}
-
-function saveJSON(filePath, data) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
-  } catch (e) {}
-}
-
-let fileDevices = loadJSON(DEVICES_FILE, []);
-
 /**
- * Register or Update a Department Device
+ * Register or Update a Department Device (Exclusive MongoDB)
  * POST /api/register-device
  */
 export const registerDevice = async (req, res) => {
@@ -59,60 +33,35 @@ export const registerDevice = async (req, res) => {
       messageCount: 0
     };
 
-    // Attempt MongoDB save
-    try {
-      let existingDevice = null;
-      if (mobileNumber && mobileNumber !== 'N/A') {
-        existingDevice = await Device.findOne({ mobileNumber });
-      }
+    let existingDevice = null;
+    if (mobileNumber && mobileNumber !== 'N/A') {
+      existingDevice = await Device.findOne({ mobileNumber });
+    }
 
-      if (existingDevice) {
-        Object.assign(existingDevice, deviceData, { deviceId: existingDevice.deviceId });
-        await existingDevice.save();
-        broadcastSSE('device_updated', existingDevice);
-        return res.status(200).json(existingDevice);
-      } else {
-        const newDevice = await Device.create(deviceData);
-        broadcastSSE('device_registered', newDevice);
-        return res.status(201).json(newDevice);
-      }
-    } catch (dbErr) {
-      console.warn("Using Local Persistent Storage for Device Registration:", dbErr.message);
-      const existingIdx = fileDevices.findIndex(d => d.mobileNumber === mobileNumber && mobileNumber !== 'N/A');
-      if (existingIdx !== -1) {
-        fileDevices[existingIdx] = { ...fileDevices[existingIdx], ...deviceData, deviceId: fileDevices[existingIdx].deviceId };
-        saveJSON(DEVICES_FILE, fileDevices);
-        broadcastSSE('device_updated', fileDevices[existingIdx]);
-        return res.status(200).json(fileDevices[existingIdx]);
-      }
-      fileDevices.push(deviceData);
-      saveJSON(DEVICES_FILE, fileDevices);
-      broadcastSSE('device_registered', deviceData);
-      return res.status(201).json(deviceData);
+    if (existingDevice) {
+      Object.assign(existingDevice, deviceData, { deviceId: existingDevice.deviceId });
+      await existingDevice.save();
+      broadcastSSE('device_updated', existingDevice);
+      return res.status(200).json(existingDevice);
+    } else {
+      const newDevice = await Device.create(deviceData);
+      broadcastSSE('device_registered', newDevice);
+      return res.status(201).json(newDevice);
     }
   } catch (error) {
     console.error("registerDevice error:", error);
-    return res.status(500).json({ error: "Server Error" });
+    return res.status(500).json({ error: "Server Error: " + error.message });
   }
 };
 
 /**
- * Get all registered department phones
+ * Get all registered department phones (Exclusive MongoDB)
  * GET /api/devices
  */
 export const getDevices = async (req, res) => {
   try {
     const now = Date.now();
-    let devicesList = [];
-
-    try {
-      devicesList = await Device.find().sort({ updatedAt: -1 }).lean();
-      if (!devicesList || devicesList.length === 0) {
-        devicesList = loadJSON(DEVICES_FILE, []);
-      }
-    } catch (dbErr) {
-      devicesList = loadJSON(DEVICES_FILE, []);
-    }
+    const devicesList = await Device.find().sort({ updatedAt: -1 }).lean();
 
     const formattedDevices = devicesList.map(d => {
       const lastSeenTime = new Date(d.lastSeen).getTime();
@@ -127,12 +76,12 @@ export const getDevices = async (req, res) => {
     return res.json(formattedDevices);
   } catch (error) {
     console.error("getDevices error:", error);
-    return res.status(500).json({ error: "Server Error" });
+    return res.status(500).json({ error: "Server Error: " + error.message });
   }
 };
 
 /**
- * Device Heartbeat Ping
+ * Device Heartbeat Ping (Exclusive MongoDB)
  * POST /api/devices/:id/heartbeat
  */
 export const deviceHeartbeat = async (req, res) => {
@@ -140,23 +89,13 @@ export const deviceHeartbeat = async (req, res) => {
     const { id } = req.params;
     const now = new Date();
 
-    try {
-      const device = await Device.findOneAndUpdate(
-        { deviceId: id },
-        { status: 'ONLINE', lastSeen: now },
-        { new: true }
-      );
-      if (device) {
-        broadcastSSE('device_ping', { deviceId: id, lastSeen: now });
-        return res.json({ success: true, lastSeen: now });
-      }
-    } catch (e) {}
+    const device = await Device.findOneAndUpdate(
+      { deviceId: id },
+      { status: 'ONLINE', lastSeen: now },
+      { new: true }
+    );
 
-    const dev = fileDevices.find(d => d.deviceId === id);
-    if (dev) {
-      dev.lastSeen = now.toISOString();
-      dev.status = 'ONLINE';
-      saveJSON(DEVICES_FILE, fileDevices);
+    if (device) {
       broadcastSSE('device_ping', { deviceId: id, lastSeen: now });
       return res.json({ success: true, lastSeen: now });
     }
@@ -164,29 +103,23 @@ export const deviceHeartbeat = async (req, res) => {
     return res.status(404).json({ error: "Device not found" });
   } catch (error) {
     console.error("deviceHeartbeat error:", error);
-    return res.status(500).json({ error: "Server Error" });
+    return res.status(500).json({ error: "Server Error: " + error.message });
   }
 };
 
 /**
- * Remove Device
+ * Remove Device (Exclusive MongoDB)
  * DELETE /api/devices/:id
  */
 export const deleteDevice = async (req, res) => {
   try {
     const { id } = req.params;
-    try {
-      await Device.deleteOne({ deviceId: id });
-    } catch (e) {}
-
-    fileDevices = fileDevices.filter(d => d.deviceId !== id);
-    saveJSON(DEVICES_FILE, fileDevices);
-
+    await Device.deleteOne({ deviceId: id });
     broadcastSSE('device_deleted', { deviceId: id });
     return res.json({ success: true, message: "Device removed" });
   } catch (error) {
     console.error("deleteDevice error:", error);
-    return res.status(500).json({ error: "Server Error" });
+    return res.status(500).json({ error: "Server Error: " + error.message });
   }
 };
 
