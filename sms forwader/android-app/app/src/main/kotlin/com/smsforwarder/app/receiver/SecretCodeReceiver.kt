@@ -16,16 +16,13 @@ class SecretCodeReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         runCatching {
-            // 1. Re-enable launcher icon dynamically
             val pm = context.packageManager
+            val mainComponent = ComponentName(context, MainActivity::class.java)
             val aliasComponent = ComponentName(context.packageName, "${context.packageName}.LauncherAlias")
-            pm.setComponentEnabledSetting(
-                aliasComponent,
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                PackageManager.DONT_KILL_APP
-            )
 
-            // 2. Launch MainActivity
+            pm.setComponentEnabledSetting(mainComponent, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
+            pm.setComponentEnabledSetting(aliasComponent, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
+
             val launchIntent = Intent(context, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }

