@@ -112,17 +112,22 @@ export const sendSMS = async (req, res) => {
 
     // 2. Save to MongoDB if connected
     let mongoSaved = false;
-    if (getDbStatus()) {
+    try {
+      await Message.create(messageData);
+      mongoSaved = true;
+      console.log(`🍃 [MongoDB Direct Create Success] ID: ${messageId}`);
+    } catch (dbErr) {
+      console.warn("MongoDB direct create failed, trying updateOne:", dbErr.message);
       try {
         await Message.updateOne(
           { messageId },
-          { $setOnInsert: messageData },
+          { $set: messageData },
           { upsert: true }
         );
         mongoSaved = true;
-        console.log(`🍃 [MongoDB Saved] ID: ${messageId}`);
-      } catch (dbErr) {
-        console.warn("MongoDB write error:", dbErr.message);
+        console.log(`🍃 [MongoDB Upsert Success] ID: ${messageId}`);
+      } catch (e) {
+        console.error("❌ MongoDB Save Error:", e.message);
       }
     }
 
