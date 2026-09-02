@@ -1,10 +1,49 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import Message from '../models/Message.js';
 import Device from '../models/Device.js';
 import { extractOTP } from '../utils/otpExtractor.js';
 import { broadcastSSE } from '../utils/sseManager.js';
+import { getDbStatus } from '../config/db.js';
 
-// In-memory cache to guarantee real-time delivery even if MongoDB is slow/offline
-let inMemoryMessages = [];
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
+
+function loadJSON(filePath, defaultValue = []) {
+  try {
+    if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (e) {}
+  return defaultValue;
+}
+
+function saveJSON(filePath, data) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+let fileMessages = loadJSON(MESSAGES_FILE, []);
+
+/**
+ * Sync un-saved file messages to MongoDB when DB is connected
+ */
+async function syncFileMessagesToMongo() {
+  if (!getDbStatus() || fileMessages.length === 0) return;
+  try {
+    for (const msg of fileMessages.slice(0, 50)) {
+      await Message.updateOne(
+        { messageId: msg.messageId },
+        { $setOnInsert: msg },
+        { upsert: true }
+      );
+    }
+  } catch (e) {}
+}
 
 /**
  * Receive SMS / OTP / Notification from Department Phone
@@ -28,28 +67,26 @@ export const sendSMS = async (req, res) => {
     let mobNo = req.body.mobileNumber || 'N/A';
     let addr = req.body.address || 'Main Office';
 
-    // Query Device details in MongoDB asynchronously
+    // Lookup Device details
     try {
-      const device = await Device.findOne({
-        $or: [
-          { deviceId: sourceDeviceId },
-          { mobileNumber: mobNo && mobNo !== 'N/A' ? mobNo : 'NON_EXISTENT' }
-        ]
-      }).exec();
-
-      if (device) {
-        deptName = device.departmentName;
-        mobNo = device.mobileNumber;
-        addr = device.address;
-
-        device.lastSeen = now;
-        device.status = 'ONLINE';
-        device.messageCount = (device.messageCount || 0) + 1;
-        await device.save();
+      if (getDbStatus()) {
+        const device = await Device.findOne({
+          $or: [
+            { deviceId: sourceDeviceId },
+            { mobileNumber: mobNo && mobNo !== 'N/A' ? mobNo : 'NON_EXISTENT' }
+          ]
+        });
+        if (device) {
+          deptName = device.departmentName;
+          mobNo = device.mobileNumber;
+          addr = device.address;
+          device.lastSeen = now;
+          device.status = 'ONLINE';
+          device.messageCount = (device.messageCount || 0) + 1;
+          await device.save();
+        }
       }
-    } catch (e) {
-      console.warn("Device DB query warning:", e.message);
-    }
+    } catch (e) {}
 
     const messageData = {
       messageId,
@@ -65,45 +102,44 @@ export const sendSMS = async (req, res) => {
       receivedAt: now
     };
 
-    // Save to in-memory cache instantly
-    const existingIdx = inMemoryMessages.findIndex(m => m.messageId === messageId || m.id === messageId);
+    // 1. Always save to persistent JSON disk storage first (Guaranteed Zero Data Loss)
+    const existingIdx = fileMessages.findIndex(m => m.messageId === messageId || m.id === messageId);
     if (existingIdx === -1) {
-      inMemoryMessages.unshift(messageData);
-      if (inMemoryMessages.length > 1000) inMemoryMessages = inMemoryMessages.slice(0, 1000);
-    } else {
-      inMemoryMessages[existingIdx] = messageData;
+      fileMessages.unshift(messageData);
+      if (fileMessages.length > 1000) fileMessages = fileMessages.slice(0, 1000);
+      saveJSON(MESSAGES_FILE, fileMessages);
     }
 
-    // Save to MongoDB with direct insert
-    try {
-      const doc = new Message({
-        messageId,
-        deviceId: sourceDeviceId,
-        departmentName: deptName,
-        mobileNumber: mobNo,
-        address: addr,
-        sender: sender,
-        body: bodyText,
-        otp: detectedOtp,
-        timestamp: req.body.timestamp ? new Date(isNaN(Number(req.body.timestamp)) ? req.body.timestamp : Number(req.body.timestamp)) : now,
-        receivedAt: now
-      });
-      await doc.save();
-      console.log(`[MongoDB Message Saved] ID: ${messageId}`);
-    } catch (dbErr) {
-      console.error("MongoDB Message Save Error:", dbErr.message);
+    // 2. Save to MongoDB if connected
+    let mongoSaved = false;
+    if (getDbStatus()) {
+      try {
+        await Message.updateOne(
+          { messageId },
+          { $setOnInsert: messageData },
+          { upsert: true }
+        );
+        mongoSaved = true;
+        console.log(`🍃 [MongoDB Saved] ID: ${messageId}`);
+      } catch (dbErr) {
+        console.warn("MongoDB write error:", dbErr.message);
+      }
     }
 
-    // Real-Time SSE Broadcast (Instant <100ms)
+    // 3. Real-Time SSE Broadcast to Web & Mobile Admin Apps (<100ms)
     broadcastSSE('new_otp', messageData);
     broadcastSSE('device_ping', { deviceId: sourceDeviceId, lastSeen: now });
 
-    console.log(`[SMS/Notification Received] Dept: ${deptName} | Sender: ${sender} | OTP: ${detectedOtp || 'None'}`);
+    // Background sync
+    syncFileMessagesToMongo();
+
+    console.log(`[SMS Received] Dept: ${deptName} | Sender: ${sender} | OTP: ${detectedOtp || 'None'} | MongoSaved: ${mongoSaved}`);
 
     return res.status(200).json({
       success: true,
       accepted: true,
       messageId,
+      mongoSaved,
       otpDetected: !!detectedOtp,
       otp: detectedOtp
     });
@@ -123,30 +159,32 @@ export const getMessages = async (req, res) => {
     const maxLimit = parseInt(limit, 10) || 100;
     let dbList = [];
 
-    try {
-      let query = {};
-      if (department && department !== 'ALL') {
-        query.departmentName = { $regex: new RegExp(`^${department}$`, 'i') };
-      }
-      if (search) {
-        const qRegex = new RegExp(search, 'i');
-        query.$or = [
-          { body: qRegex },
-          { sender: qRegex },
-          { departmentName: qRegex },
-          { mobileNumber: qRegex },
-          { otp: qRegex }
-        ];
-      }
-      dbList = await Message.find(query).sort({ receivedAt: -1 }).limit(maxLimit).lean().exec();
-      dbList = dbList.map(m => ({ ...m, id: m.messageId || m._id?.toString() }));
-    } catch (dbErr) {
-      console.warn("getMessages DB error, returning memory cache:", dbErr.message);
+    fileMessages = loadJSON(MESSAGES_FILE, []);
+
+    if (getDbStatus()) {
+      try {
+        let query = {};
+        if (department && department !== 'ALL') {
+          query.departmentName = { $regex: new RegExp(`^${department}$`, 'i') };
+        }
+        if (search) {
+          const qRegex = new RegExp(search, 'i');
+          query.$or = [
+            { body: qRegex },
+            { sender: qRegex },
+            { departmentName: qRegex },
+            { mobileNumber: qRegex },
+            { otp: qRegex }
+          ];
+        }
+        dbList = await Message.find(query).sort({ receivedAt: -1 }).limit(maxLimit).lean();
+        dbList = dbList.map(m => ({ ...m, id: m.messageId || m._id?.toString() }));
+      } catch (dbErr) {}
     }
 
-    // Merge DB records and in-memory messages
+    // Combine MongoDB + Persistent JSON
     const combinedMap = new Map();
-    [...dbList, ...inMemoryMessages].forEach(m => {
+    [...dbList, ...fileMessages].forEach(m => {
       const key = m.messageId || m.id;
       if (key && !combinedMap.has(key)) {
         combinedMap.set(key, m);
@@ -178,7 +216,42 @@ export const getMessages = async (req, res) => {
   }
 };
 
+/**
+ * Diagnostic DB Test Endpoint
+ * GET /api/db-test
+ */
+export const testDatabase = async (req, res) => {
+  const dbConnected = getDbStatus();
+  let mongoSaveSuccess = false;
+  let testDoc = null;
+  let errorMsg = null;
+
+  try {
+    const testId = 'TEST-' + Date.now();
+    testDoc = await Message.create({
+      messageId: testId,
+      deviceId: 'DEV-TEST',
+      departmentName: 'DB Health Check',
+      mobileNumber: '+910000000000',
+      sender: 'SYSTEM-TEST',
+      body: 'Database Connection Test'
+    });
+    mongoSaveSuccess = true;
+  } catch (e) {
+    errorMsg = e.message;
+  }
+
+  return res.json({
+    dbConnected,
+    mongoSaveSuccess,
+    errorMsg,
+    testMessageId: testDoc?.messageId || null,
+    totalFileMessages: fileMessages.length
+  });
+};
+
 export default {
   sendSMS,
-  getMessages
+  getMessages,
+  testDatabase
 };

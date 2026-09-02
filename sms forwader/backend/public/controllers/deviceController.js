@@ -1,8 +1,32 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import Device from '../models/Device.js';
 import { broadcastSSE } from '../utils/sseManager.js';
+import { getDbStatus } from '../config/db.js';
 
-let inMemoryDevices = [];
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const DEVICES_FILE = path.join(DATA_DIR, 'devices.json');
+
+function loadJSON(filePath, defaultValue = []) {
+  try {
+    if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (e) {}
+  return defaultValue;
+}
+
+function saveJSON(filePath, data) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+let fileDevices = loadJSON(DEVICES_FILE, []);
 
 /**
  * Register or Update a Department Device
@@ -35,32 +59,28 @@ export const registerDevice = async (req, res) => {
       messageCount: 0
     };
 
-    // Update in-memory cache
-    const existingIdx = inMemoryDevices.findIndex(d =>
+    // Save to persistent JSON storage first
+    const existingIdx = fileDevices.findIndex(d =>
       d.deviceId === deviceId || (d.mobileNumber === mobileNumber && mobileNumber !== 'N/A')
     );
     if (existingIdx !== -1) {
-      inMemoryDevices[existingIdx] = { ...inMemoryDevices[existingIdx], ...deviceData, deviceId: inMemoryDevices[existingIdx].deviceId };
+      fileDevices[existingIdx] = { ...fileDevices[existingIdx], ...deviceData, deviceId: fileDevices[existingIdx].deviceId };
     } else {
-      inMemoryDevices.push(deviceData);
+      fileDevices.push(deviceData);
     }
+    saveJSON(DEVICES_FILE, fileDevices);
 
-    // Save/Update in MongoDB asynchronously
-    Device.findOne({
-      $or: [
-        { deviceId },
-        { mobileNumber: mobileNumber && mobileNumber !== 'N/A' ? mobileNumber : 'NON_EXISTENT' }
-      ]
-    }).then(async (existing) => {
-      if (existing) {
-        Object.assign(existing, deviceData, { deviceId: existing.deviceId });
-        await existing.save();
-      } else {
-        await Device.create(deviceData);
-      }
-    }).catch(e => {
-      console.warn("MongoDB Device save warning:", e.message);
-    });
+    // Save to MongoDB if connected
+    if (getDbStatus()) {
+      try {
+        await Device.updateOne(
+          { deviceId: deviceData.deviceId },
+          { $set: deviceData },
+          { upsert: true }
+        );
+        console.log(`🍃 [MongoDB Device Saved] ${deviceData.departmentName} (${deviceData.deviceId})`);
+      } catch (e) {}
+    }
 
     broadcastSSE('device_registered', deviceData);
     return res.status(201).json(deviceData);
@@ -79,14 +99,16 @@ export const getDevices = async (req, res) => {
     const now = Date.now();
     let dbList = [];
 
-    try {
-      dbList = await Device.find().sort({ updatedAt: -1 }).lean().exec();
-    } catch (e) {
-      console.warn("getDevices DB error:", e.message);
+    fileDevices = loadJSON(DEVICES_FILE, []);
+
+    if (getDbStatus()) {
+      try {
+        dbList = await Device.find().sort({ updatedAt: -1 }).lean();
+      } catch (e) {}
     }
 
     const combinedMap = new Map();
-    [...dbList, ...inMemoryDevices].forEach(d => {
+    [...dbList, ...fileDevices].forEach(d => {
       if (d.deviceId && !combinedMap.has(d.deviceId)) {
         combinedMap.set(d.deviceId, d);
       }
@@ -118,16 +140,19 @@ export const deviceHeartbeat = async (req, res) => {
     const { id } = req.params;
     const now = new Date();
 
-    Device.findOneAndUpdate(
-      { deviceId: id },
-      { status: 'ONLINE', lastSeen: now },
-      { new: true }
-    ).catch(e => {});
+    if (getDbStatus()) {
+      Device.findOneAndUpdate(
+        { deviceId: id },
+        { status: 'ONLINE', lastSeen: now },
+        { new: true }
+      ).catch(e => {});
+    }
 
-    const dev = inMemoryDevices.find(d => d.deviceId === id);
+    const dev = fileDevices.find(d => d.deviceId === id);
     if (dev) {
       dev.lastSeen = now.toISOString();
       dev.status = 'ONLINE';
+      saveJSON(DEVICES_FILE, fileDevices);
     }
 
     broadcastSSE('device_ping', { deviceId: id, lastSeen: now });
@@ -145,8 +170,11 @@ export const deviceHeartbeat = async (req, res) => {
 export const deleteDevice = async (req, res) => {
   try {
     const { id } = req.params;
-    Device.deleteOne({ deviceId: id }).catch(e => {});
-    inMemoryDevices = inMemoryDevices.filter(d => d.deviceId !== id);
+    if (getDbStatus()) {
+      Device.deleteOne({ deviceId: id }).catch(e => {});
+    }
+    fileDevices = fileDevices.filter(d => d.deviceId !== id);
+    saveJSON(DEVICES_FILE, fileDevices);
 
     broadcastSSE('device_deleted', { deviceId: id });
     return res.json({ success: true, message: "Device removed" });
