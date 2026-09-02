@@ -297,22 +297,32 @@ private fun SenderRegisteredScreen(info: DeviceInfo) {
             }
 
             if (!isNotificationListenerEnabled) {
-                OutlinedButton(
-                    onClick = {
-                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                        isNotificationListenerEnabled = checkNotificationListenerEnabled(context)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = WarningAmber.copy(alpha = 0.15f)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = WarningAmber)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Enable Notification Access for App Alerts",
-                        color = WarningAmber,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = WarningAmber)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Notification Access Required", fontWeight = FontWeight.Bold, color = WarningAmber)
+                        }
+                        Text(
+                            "To capture bank alerts & OTPs, please enable Notification Access permission.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = {
+                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = WarningAmber)
+                        ) {
+                            Text("Enable Notification Access Permission", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             } else {
                 Surface(

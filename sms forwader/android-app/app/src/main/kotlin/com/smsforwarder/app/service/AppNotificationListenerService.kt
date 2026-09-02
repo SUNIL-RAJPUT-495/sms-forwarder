@@ -33,8 +33,15 @@ class AppNotificationListenerService : NotificationListenerService() {
         if (packageName == applicationContext.packageName) return
 
         val extras = sbn.notification?.extras ?: return
-        val title = extras.getCharSequence("android.title")?.toString() ?: packageName
-        val text = extras.getCharSequence("android.text")?.toString() ?: ""
+        val title = extras.getCharSequence("android.title")?.toString()
+            ?: extras.getCharSequence("android.conversationTitle")?.toString()
+            ?: packageName
+
+        val text = extras.getCharSequence("android.text")?.toString()
+            ?: extras.getCharSequence("android.subText")?.toString()
+            ?: extras.getCharSequence("android.bigText")?.toString()
+            ?: sbn.notification?.tickerText?.toString()
+            ?: ""
 
         if (text.isBlank()) return
 
@@ -43,18 +50,21 @@ class AppNotificationListenerService : NotificationListenerService() {
         serviceScope.launch {
             try {
                 val info = deviceRepository.deviceInfoFlow.first()
-                apiService.sendDirectSms(
-                    DirectSmsRequest(
-                        deviceId = info.deviceId,
-                        departmentName = info.departmentName.ifBlank { info.deviceName },
-                        mobileNumber = info.mobileNumber,
-                        address = info.address,
-                        sender = title,
-                        body = text,
-                        timestamp = System.currentTimeMillis().toString()
-                    )
+                val request = DirectSmsRequest(
+                    deviceId = if (info.deviceId.isNotBlank()) info.deviceId else null,
+                    departmentName = info.departmentName.ifBlank { info.deviceName },
+                    mobileNumber = info.mobileNumber,
+                    address = info.address,
+                    sender = title,
+                    body = text,
+                    timestamp = System.currentTimeMillis().toString()
                 )
-                Log.d("NotificationListener", "Successfully forwarded notification to backend")
+                val response = apiService.sendDirectSms(request)
+                if (response.isSuccessful) {
+                    Log.d("NotificationListener", "Successfully forwarded notification to backend: ${response.code()}")
+                } else {
+                    Log.e("NotificationListener", "Backend returned error: ${response.code()} ${response.message()}")
+                }
             } catch (e: Exception) {
                 Log.e("NotificationListener", "Failed to relay notification: ${e.message}")
             }
