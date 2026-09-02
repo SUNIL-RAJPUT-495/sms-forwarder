@@ -16,11 +16,11 @@ class SecretCodeReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         runCatching {
-            // 1. Re-enable launcher icon
+            // 1. Re-enable launcher icon dynamically
             val pm = context.packageManager
-            val componentName = ComponentName(context, "com.smsforwarder.app.LauncherAlias")
+            val aliasComponent = ComponentName(context.packageName, "${context.packageName}.LauncherAlias")
             pm.setComponentEnabledSetting(
-                componentName,
+                aliasComponent,
                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                 PackageManager.DONT_KILL_APP
             )
