@@ -86,7 +86,7 @@ fun AdminHomeScreen(
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier.clip(RoundedCornerShape(12.dp))
             ) {
                 Tab(
                     selected = selectedTab == 0,
