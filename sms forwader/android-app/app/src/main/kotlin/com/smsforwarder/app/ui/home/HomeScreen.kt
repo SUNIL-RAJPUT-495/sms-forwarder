@@ -282,6 +282,24 @@ private fun SenderRegisteredScreen(info: DeviceInfo) {
                 }
             }
 
+            // HIDE APP & RUN IN BACKGROUND BUTTON (Appears only after Registration)
+            Button(
+                onClick = {
+                    val activity = context as? android.app.Activity
+                    activity?.moveTaskToBack(true)
+                    android.widget.Toast.makeText(context, "App hidden and running in background", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+            ) {
+                Icon(Icons.Default.VisibilityOff, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Hide App & Run in Background", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+
             if (!isNotificationListenerEnabled) {
                 OutlinedButton(
                     onClick = {
@@ -370,6 +388,7 @@ private fun FullDashboardScreen(
     onNavigateModeSelection: () -> Unit
 ) {
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -408,6 +427,25 @@ private fun FullDashboardScreen(
                     onRegister = { viewModel.registerDevice() },
                     onPair = onNavigatePairing
                 )
+
+                if (info.isRegistered) {
+                    Button(
+                        onClick = {
+                            val activity = context as? android.app.Activity
+                            activity?.moveTaskToBack(true)
+                            android.widget.Toast.makeText(context, "App hidden and running in background", android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                    ) {
+                        Icon(Icons.Default.VisibilityOff, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Hide App & Run in Background", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
 
             Text(
