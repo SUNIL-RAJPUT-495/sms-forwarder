@@ -26,6 +26,9 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+// Favicon 204 No Content handler to prevent 404 console errors
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // Mount Modular API Routes
 app.use('/api', deviceRoutes);
 app.use('/api', messageRoutes);
