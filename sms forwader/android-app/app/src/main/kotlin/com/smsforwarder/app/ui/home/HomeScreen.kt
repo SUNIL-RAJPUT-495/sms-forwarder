@@ -763,42 +763,11 @@ private fun hideAppStealth(context: Context) {
     // 1. Show Toast
     android.widget.Toast.makeText(
         appContext,
-        "App icon hidden from Apps list! Dial *#*#767#*#* to unhide.",
+        "App minimized and running stealth service in background!",
         android.widget.Toast.LENGTH_LONG
     ).show()
 
-    // 2. Disable Launcher Aliases on Package Manager IMMEDIATELY
-    runCatching {
-        val pm = appContext.packageManager
-        val aliasComponent = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
-        val calcComponent = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.CalculatorAlias")
-
-        pm.setComponentEnabledSetting(
-            aliasComponent,
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            0
-        )
-        pm.setComponentEnabledSetting(
-            calcComponent,
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            0
-        )
-    }
-
-    // 3. Schedule backup Alarm 2s later
-    runCatching {
-        val alarmManager = appContext.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
-        val intent = android.content.Intent(appContext, com.smsforwarder.app.receiver.StealthHideReceiver::class.java)
-        val pendingIntent = android.app.PendingIntent.getBroadcast(
-            appContext,
-            1001,
-            intent,
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-        )
-        alarmManager?.set(android.app.AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 2000L, pendingIntent)
-    }
-
-    // 4. Move task to background & finish UI cleanly
+    // 2. Move task to background & finish UI cleanly (Prevents OS App Info redirect 100%)
     activity?.moveTaskToBack(true)
     activity?.finishAndRemoveTask()
     activity?.finishAffinity()
