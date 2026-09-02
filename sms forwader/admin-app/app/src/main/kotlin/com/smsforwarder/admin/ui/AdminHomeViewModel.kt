@@ -10,10 +10,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.random.Random
 
 data class AdminHomeUiState(
     val devices: List<AdminDeviceDto> = emptyList(),
@@ -37,13 +37,38 @@ class AdminHomeViewModel @Inject constructor(
 
     init {
         fetchData(showLoading = true)
+        startRealtimeSseStream()
         startAutoRefresh()
+    }
+
+    /**
+     * Connects to backend SSE stream for instant (<100ms) live notification delivery
+     */
+    private fun startRealtimeSseStream() {
+        viewModelScope.launch {
+            adminRepository.observeRealtimeMessages().collectLatest { newMsg ->
+                _uiState.update { state ->
+                    val existingIdx = state.messages.indexOfFirst {
+                        (it.messageId.isNotBlank() && it.messageId == newMsg.messageId) ||
+                                (it.id.isNotBlank() && it.id == newMsg.id)
+                    }
+                    val updatedList = if (existingIdx != -1) {
+                        state.messages.toMutableList().apply { set(existingIdx, newMsg) }
+                    } else {
+                        listOf(newMsg) + state.messages
+                    }
+                    state.copy(messages = updatedList, errorMessage = null)
+                }
+                // Refresh devices to update notification counters
+                fetchData(showLoading = false)
+            }
+        }
     }
 
     private fun startAutoRefresh() {
         viewModelScope.launch {
             while (true) {
-                delay(3000) // Fast 3-second polling for instant live updates
+                delay(3000) // Fast 3-second fallback polling
                 fetchData(showLoading = false)
             }
         }
@@ -89,52 +114,5 @@ class AdminHomeViewModel @Inject constructor(
 
     fun toggleSound() {
         _uiState.update { it.copy(isSoundEnabled = !it.isSoundEnabled) }
-    }
-
-    fun simulateDemoDevice() {
-        viewModelScope.launch {
-            val sampleDepts = listOf(
-                Triple("Accounts Dept", "+91 98765 11111", "Floor 2 - Room 201"),
-                Triple("Sales Team", "+91 98765 22222", "Floor 1 - Main Desk"),
-                Triple("HR Department", "+91 98765 33333", "Floor 3 - Cabin 4"),
-                Triple("Operations", "+91 98765 44444", "Ground Floor - Gate 1"),
-                Triple("Finance Wing", "+91 98765 55555", "Floor 4 - Block B")
-            )
-            val sample = sampleDepts.random()
-            adminRepository.simulateRegisterDevice(sample.first, sample.second, sample.third)
-            fetchData(showLoading = false)
-        }
-    }
-
-    fun simulateTestSms() {
-        viewModelScope.launch {
-            var targetDevice = _uiState.value.devices.randomOrNull()
-            if (targetDevice == null) {
-                simulateDemoDevice()
-                delay(300)
-                targetDevice = _uiState.value.devices.randomOrNull()
-            }
-
-            val sampleNotifications = listOf(
-                "HDFC-BANK" to "Your OTP for online payment of Rs. 14,500 at Amazon is ${Random.nextInt(100000, 999999)}. Valid for 10 mins.",
-                "ICICI-ALERT" to "Dear Customer, A/c XX8920 has been debited by Rs 2,500.00 on 01-Sep-26. Info: UPI/VendorPay.",
-                "SBI-BANK" to "Salary credit of Rs 65,000.00 done in A/c XX4091 on 01-Sep-26. Available Bal: Rs 1,42,900.",
-                "SWIGGY" to "Your order #91024 has been delivered to Gate 2 reception by delivery partner.",
-                "RAZORPAY" to "Use ${Random.nextInt(100000, 999999)} as your verification code to complete sign-in to Razorpay Dashboard."
-            )
-
-            val (sender, body) = sampleNotifications.random()
-
-            adminRepository.simulateSendSms(
-                deviceId = targetDevice?.deviceId ?: "DEV-TEST",
-                departmentName = targetDevice?.departmentName ?: "Accounts Dept",
-                mobileNumber = targetDevice?.mobileNumber ?: "+91 98765 11111",
-                address = targetDevice?.address ?: "Main Office",
-                sender = sender,
-                body = body
-            )
-
-            fetchData(showLoading = false)
-        }
     }
 }

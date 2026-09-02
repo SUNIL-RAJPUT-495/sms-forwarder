@@ -13,6 +13,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import java.util.concurrent.TimeUnit
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -38,6 +39,22 @@ object AppModule {
             .addInterceptor(logging)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("SseClient")
+    fun provideSseOkHttpClient(): OkHttpClient {
+        val logging = HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+        }
+
+        return OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.SECONDS) // Infinite read timeout for SSE stream
             .writeTimeout(15, TimeUnit.SECONDS)
             .build()
     }
