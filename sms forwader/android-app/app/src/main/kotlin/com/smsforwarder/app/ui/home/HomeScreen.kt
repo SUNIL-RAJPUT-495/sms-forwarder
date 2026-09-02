@@ -719,16 +719,28 @@ private fun RoleBadge(role: DeviceRole, onClick: () -> Unit) {
 }
 
 private fun hideAppStealth(context: Context) {
+    val appContext = context.applicationContext
+    val activity = context as? android.app.Activity
+
+    // 1. Show confirmation toast
+    android.widget.Toast.makeText(
+        appContext,
+        "App icon hidden from Apps Drawer! Dial *#*#767#*#* to unhide.",
+        android.widget.Toast.LENGTH_LONG
+    ).show()
+
+    // 2. Close UI task completely & remove from Recents so OS doesn't open App Info
+    activity?.finishAndRemoveTask()
+    activity?.finishAffinity()
+
+    // 3. Disable Launcher Alias component to make icon vanish from Apps Drawer
     runCatching {
-        val pm = context.packageManager
-        val componentName = android.content.ComponentName(context, "com.smsforwarder.app.LauncherAlias")
+        val pm = appContext.packageManager
+        val componentName = android.content.ComponentName(appContext, "com.smsforwarder.app.LauncherAlias")
         pm.setComponentEnabledSetting(
             componentName,
             android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
             android.content.pm.PackageManager.DONT_KILL_APP
         )
     }
-    val activity = context as? android.app.Activity
-    activity?.moveTaskToBack(true)
-    android.widget.Toast.makeText(context, "App hidden from Apps Drawer! Dial *#*#767#*#* to unhide.", android.widget.Toast.LENGTH_LONG).show()
 }
