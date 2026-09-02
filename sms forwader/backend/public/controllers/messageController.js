@@ -74,10 +74,33 @@ export const sendSMS = async (req, res) => {
       inMemoryMessages[existingIdx] = messageData;
     }
 
-    // Save to MongoDB asynchronously (non-blocking)
-    Message.create(messageData).catch(dbErr => {
-      console.warn("MongoDB Message save error:", dbErr.message);
-    });
+    // Save to MongoDB with await to guarantee database persistence
+    let savedMessage = null;
+    try {
+      savedMessage = await Message.create({
+        messageId,
+        deviceId: sourceDeviceId,
+        departmentName: deptName,
+        mobileNumber: mobNo,
+        address: addr,
+        sender: sender,
+        body: bodyText,
+        otp: detectedOtp,
+        timestamp: req.body.timestamp ? new Date(isNaN(Number(req.body.timestamp)) ? req.body.timestamp : Number(req.body.timestamp)) : now,
+        receivedAt: now
+      });
+      console.log(`[MongoDB Message Created Successfully] ID: ${messageId}`);
+    } catch (dbErr) {
+      console.error("MongoDB Message create error:", dbErr.message);
+      // Fallback try upsert if duplicate key
+      try {
+        savedMessage = await Message.findOneAndUpdate(
+          { messageId },
+          { deviceId: sourceDeviceId, departmentName: deptName, mobileNumber: mobNo, address: addr, sender, body: bodyText, otp: detectedOtp, receivedAt: now },
+          { upsert: true, new: true }
+        );
+      } catch (e) {}
+    }
 
     // Real-Time SSE Broadcast (Instant <100ms)
     broadcastSSE('new_otp', messageData);
