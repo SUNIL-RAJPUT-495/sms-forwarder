@@ -1,0 +1,2 @@
+-keep class com.smsforwarder.admin.domain.model.** { *; }
+-keep class com.smsforwarder.admin.network.** { *; }

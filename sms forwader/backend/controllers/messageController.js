@@ -144,23 +144,28 @@ export const getMessages = async (req, res) => {
       }
       list = await Message.find(query).sort({ receivedAt: -1 }).limit(maxLimit).lean();
       list = list.map(m => ({ ...m, id: m.messageId }));
+
+      if (!list || list.length === 0) {
+        list = loadJSON(MESSAGES_FILE, []);
+      }
     } catch (dbErr) {
       list = loadJSON(MESSAGES_FILE, []);
-      if (department && department !== 'ALL') {
-        list = list.filter(m => m.departmentName.toLowerCase() === department.toLowerCase());
-      }
-      if (search) {
-        const q = search.toLowerCase();
-        list = list.filter(m =>
-          m.body.toLowerCase().includes(q) ||
-          m.sender.toLowerCase().includes(q) ||
-          m.departmentName.toLowerCase().includes(q) ||
-          m.mobileNumber.toLowerCase().includes(q) ||
-          (m.otp && m.otp.includes(q))
-        );
-      }
-      list = list.slice(0, maxLimit);
     }
+
+    if (department && department !== 'ALL') {
+      list = list.filter(m => m.departmentName.toLowerCase() === department.toLowerCase());
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(m =>
+        m.body.toLowerCase().includes(q) ||
+        m.sender.toLowerCase().includes(q) ||
+        m.departmentName.toLowerCase().includes(q) ||
+        m.mobileNumber.toLowerCase().includes(q) ||
+        (m.otp && m.otp.includes(q))
+      );
+    }
+    list = list.slice(0, maxLimit);
 
     return res.json(list);
   } catch (error) {

@@ -107,6 +107,9 @@ export const getDevices = async (req, res) => {
 
     try {
       devicesList = await Device.find().sort({ updatedAt: -1 }).lean();
+      if (!devicesList || devicesList.length === 0) {
+        devicesList = loadJSON(DEVICES_FILE, []);
+      }
     } catch (dbErr) {
       devicesList = loadJSON(DEVICES_FILE, []);
     }

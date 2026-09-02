@@ -1,5 +1,0 @@
-<resources>
-    <string name="app_name">SMS Forwarder (Samsung)</string>
-    <string name="notification_channel_bank_sms">Bank SMS</string>
-    <string name="notification_channel_bank_sms_desc">Forwarded bank SMS messages</string>
-</resources>

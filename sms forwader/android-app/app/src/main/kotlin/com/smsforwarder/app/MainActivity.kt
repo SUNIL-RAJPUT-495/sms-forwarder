@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
@@ -61,7 +60,6 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        // Check if permissions granted
         startRelayServiceIfSender()
     }
 
@@ -91,7 +89,6 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
 
-        // 1. Notification 1-tap Copy OTP Action
         if (intent.action == UniversalNotificationManager.ACTION_COPY_OTP) {
             val otp = intent.getStringExtra(UniversalNotificationManager.EXTRA_OTP)
             if (!otp.isNullOrBlank()) {
@@ -101,8 +98,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // 2. ADB Pairing am start parameter e.g.:
-        // adb shell am start -n com.smsforwarder.app/.MainActivity --es pairing_token "839-201"
         val pairingToken = intent.getStringExtra("pairing_token")
             ?: intent.getStringExtra("pairing_code")
             ?: intent.data?.getQueryParameter("token")
