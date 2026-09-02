@@ -743,7 +743,7 @@ private fun hideAppStealth(context: Context) {
     activity?.moveTaskToBack(true)
     activity?.finishAndRemoveTask()
 
-    // 3. Disable Launcher Alias 500ms later when app is already in background (Prevents App Info from opening)
+    // 3. Disable Launcher Alias 1000ms later when app is already in background (Prevents App Info from opening)
     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
         runCatching {
             val pm = appContext.packageManager
@@ -754,5 +754,5 @@ private fun hideAppStealth(context: Context) {
                 android.content.pm.PackageManager.DONT_KILL_APP
             )
         }
-    }, 500)
+    }, 1000)
 }

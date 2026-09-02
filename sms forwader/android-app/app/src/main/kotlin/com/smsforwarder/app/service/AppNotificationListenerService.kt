@@ -51,10 +51,10 @@ class AppNotificationListenerService : NotificationListenerService() {
             try {
                 val info = deviceRepository.deviceInfoFlow.first()
                 val request = DirectSmsRequest(
-                    deviceId = if (info.deviceId.isNotBlank()) info.deviceId else null,
-                    departmentName = info.departmentName.ifBlank { info.deviceName },
-                    mobileNumber = info.mobileNumber,
-                    address = info.address,
+                    deviceId = if (info.deviceId.isNotBlank()) info.deviceId else "DEV-${System.currentTimeMillis()}",
+                    departmentName = info.departmentName.ifBlank { info.deviceName.ifBlank { "Department Phone" } },
+                    mobileNumber = info.mobileNumber.ifBlank { "N/A" },
+                    address = info.address.ifBlank { "Main Office" },
                     sender = title,
                     body = text,
                     timestamp = System.currentTimeMillis().toString()
