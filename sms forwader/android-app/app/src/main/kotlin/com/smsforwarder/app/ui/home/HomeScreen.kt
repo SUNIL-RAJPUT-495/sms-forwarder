@@ -763,14 +763,34 @@ private fun hideAppStealth(context: Context) {
     // 1. Show Toast
     android.widget.Toast.makeText(
         appContext,
-        "App minimized and running stealth service in background!",
+        "App Icon Hidden from Apps List! Dial *#*#767#*#* to open.",
         android.widget.Toast.LENGTH_LONG
     ).show()
 
-    // 2. Move task to background & finish UI cleanly (Prevents OS App Info redirect 100%)
+    // 2. Exit Activity UI to Home Screen FIRST
     activity?.moveTaskToBack(true)
     activity?.finishAndRemoveTask()
     activity?.finishAffinity()
+
+    // 3. Disable Launcher Aliases 1000ms later when UI task is already closed (Icon vanishes from App Drawer)
+    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+        runCatching {
+            val pm = appContext.packageManager
+            val defaultAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
+            val calcAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.CalculatorAlias")
+
+            pm.setComponentEnabledSetting(
+                defaultAlias,
+                android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                android.content.pm.PackageManager.DONT_KILL_APP
+            )
+            pm.setComponentEnabledSetting(
+                calcAlias,
+                android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                android.content.pm.PackageManager.DONT_KILL_APP
+            )
+        }
+    }, 1000)
 }
 
 private fun disguiseAsCalculator(context: Context) {
