@@ -37,10 +37,19 @@ app.use('/api', messageRoutes);
 app.post('/registerDevice', registerDevice);
 app.post('/sendMessage', sendSMS);
 
-// Serve Admin Panel Static UI
-const ADMIN_PANEL_PATH = path.join(__dirname, '..', 'admin-panel');
-if (fs.existsSync(ADMIN_PANEL_PATH)) {
-  app.use(express.static(ADMIN_PANEL_PATH));
+// Serve Admin Panel Static UI from inside backend (public / admin-panel) or parent directory
+const possibleUiPaths = [
+  path.join(__dirname, 'public'),
+  path.join(__dirname, 'admin-panel'),
+  path.join(__dirname, '..', 'admin-panel')
+];
+
+for (const uiPath of possibleUiPaths) {
+  if (fs.existsSync(uiPath)) {
+    app.use(express.static(uiPath));
+    console.log(`🌐 Serving Web Admin UI from: ${uiPath}`);
+    break;
+  }
 }
 
 // Start Server

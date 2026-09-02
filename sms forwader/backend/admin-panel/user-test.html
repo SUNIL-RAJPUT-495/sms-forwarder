@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Department Phone Setup & Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --primary: #6366f1;
+      --accent: #10b981;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .mobile-frame {
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .header h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+    .header p { font-size: 13px; color: var(--muted); }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    input, textarea {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: white;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus, textarea:focus {
+      border-color: var(--primary);
+    }
+    .btn {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #4f46e5; }
+    .btn-green { background: var(--accent); }
+    .btn-green:hover { background: #059669; }
+    .status-box {
+      margin-top: 20px;
+      padding: 12px;
+      border-radius: 10px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      font-size: 13px;
+      display: none;
+      text-align: center;
+    }
+    .divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 24px 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="mobile-frame">
+  <div class="header">
+    <h2>📱 Department Phone Setup</h2>
+    <p>User App Registration & OTP Sender</p>
+  </div>
+
+  <!-- Step 1: Registration Form -->
+  <div id="step-register">
+    <div class="form-group">
+      <label>Department Name</label>
+      <input type="text" id="dept-name" placeholder="e.g. Accounts Department" value="Accounts Dept">
+    </div>
+
+    <div class="form-group">
+      <label>Mobile Number</label>
+      <input type="text" id="mobile-no" placeholder="e.g. +91 9876543210" value="+91 98765 43210">
+    </div>
+
+    <div class="form-group">
+      <label>Office Address / Location</label>
+      <input type="text" id="address" placeholder="e.g. Floor 2, Room 201" value="Floor 2, Room 201">
+    </div>
+
+    <button class="btn" id="btn-register">📲 Register Phone with Office Admin</button>
+  </div>
+
+  <!-- Step 2: Send Test OTP SMS -->
+  <div id="step-test-sms" style="display: none;">
+    <div class="divider"></div>
+    <div class="header" style="margin-bottom: 14px;">
+      <h2>💬 Test Send Incoming OTP</h2>
+      <p>Simulate bank SMS received on this phone</p>
+    </div>
+
+    <div class="form-group">
+      <label>Bank / Sender ID</label>
+      <input type="text" id="sms-sender" value="HDFC-BANK">
+    </div>
+
+    <div class="form-group">
+      <label>SMS Text Body</label>
+      <textarea id="sms-body" rows="3">Your OTP for transaction of Rs. 12,500 at Amazon is 948201. Valid for 10 mins.</textarea>
+    </div>
+
+    <button class="btn btn-green" id="btn-send-sms">🚀 Send OTP to Admin Panel</button>
+  </div>
+
+  <div id="status-box" class="status-box"></div>
+</div>
+
+<script>
+  let registeredDevice = null;
+
+  document.getElementById('btn-register').addEventListener('click', async () => {
+    const deptName = document.getElementById('dept-name').value.trim();
+    const mobileNo = document.getElementById('mobile-no').value.trim();
+    const address = document.getElementById('address').value.trim();
+
+    if (!deptName || !mobileNo) {
+      alert("Please enter Department Name and Mobile Number");
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/register-device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          departmentName: deptName,
+          mobileNumber: mobileNo,
+          address: address,
+          role: 'SOURCE'
+        })
+      });
+
+      if (res.ok) {
+        registeredDevice = await res.json();
+        const statusBox = document.getElementById('status-box');
+        statusBox.style.display = 'block';
+        statusBox.innerHTML = `✓ Registered Successfully!<br><strong>Device ID:</strong> ${registeredDevice.deviceId}`;
+        document.getElementById('step-test-sms').style.display = 'block';
+      }
+    } catch (err) {
+      alert("Registration failed: " + err.message);
+    }
+  });
+
+  document.getElementById('btn-send-sms').addEventListener('click', async () => {
+    if (!registeredDevice) {
+      alert("Please register first");
+      return;
+    }
+
+    const sender = document.getElementById('sms-sender').value.trim();
+    const body = document.getElementById('sms-body').value.trim();
+
+    try {
+      const res = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: registeredDevice.deviceId,
+          departmentName: registeredDevice.departmentName,
+          mobileNumber: registeredDevice.mobileNumber,
+          address: registeredDevice.address,
+          sender: sender,
+          body: body,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const statusBox = document.getElementById('status-box');
+        statusBox.style.display = 'block';
+        statusBox.innerHTML = `⚡ OTP Sent to Office Admin Panel!<br><strong>Detected OTP:</strong> ${data.otp || 'None'}`;
+      }
+    } catch (err) {
+      alert("Failed to send SMS: " + err.message);
+    }
+  });
+</script>
+
+</body>
+</html>

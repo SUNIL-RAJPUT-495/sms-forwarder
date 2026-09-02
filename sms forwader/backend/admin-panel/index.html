@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Office Central Admin Panel - All SMS & Notification Relay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Header Navbar -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="logo-icon">🏢</div>
+        <div>
+          <h1>Central Office Admin Hub</h1>
+          <p class="subtitle">Multi-Department Phone & All SMS Notification Manager</p>
+        </div>
+      </div>
+
+      <div class="header-stats">
+        <div class="stat-badge">
+          <span class="stat-dot green pulse"></span>
+          <span class="stat-label">Live Stream:</span>
+          <span id="connection-status" class="stat-value text-green">Connecting...</span>
+        </div>
+        <div class="stat-badge">
+          <span class="stat-label">Registered Phones:</span>
+          <span id="stat-active-devices" class="stat-value">0</span>
+        </div>
+        <div class="stat-badge">
+          <span class="stat-label">Total Notifications:</span>
+          <span id="stat-total-otps" class="stat-value">0</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-sound-toggle" class="btn btn-primary" title="Toggle Beep Sound">
+          <span id="sound-icon">🔊</span> Sound ON
+        </button>
+        <div id="live-clock" class="digital-clock">00:00:00</div>
+      </div>
+    </header>
+
+    <!-- Main Layout: Users First -->
+    <main class="main-layout">
+      
+      <!-- Primary Left Column: Department Users Directory -->
+      <section class="panel users-directory-panel">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <h2>👥 Department Users & Phones</h2>
+            <span id="devices-count-badge" class="count-badge">0 Registered</span>
+          </div>
+
+          <div class="user-search-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="user-search-input" placeholder="Search user, mobile, or department..." />
+          </div>
+
+          <button id="btn-simulate-device" class="btn btn-outline btn-sm">+ Demo User</button>
+        </div>
+
+        <!-- Users Grid -->
+        <div id="users-grid" class="users-grid">
+          <div class="empty-state" id="empty-devices-state">
+            <div class="empty-icon">📱</div>
+            <h3>No Department Phones Registered Yet</h3>
+            <p>Install the Android App on department phones to see them listed here automatically.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Secondary Right Column: Live Notifications Feed -->
+      <aside class="panel live-feed-panel">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <h2>⚡ Live Notifications Stream</h2>
+            <span class="live-pill"><span class="pulse-dot"></span> REALTIME</span>
+          </div>
+          <button id="btn-simulate-sms" class="btn btn-accent btn-sm">🧪 Test Notification</button>
+        </div>
+
+        <div id="live-feed-container" class="live-feed-container">
+          <div class="empty-state" id="empty-otp-state">
+            <div class="empty-icon">📥</div>
+            <h3>Waiting for Live Notifications...</h3>
+            <p>Incoming notifications and SMS from any department phone will stream here live in real-time.</p>
+          </div>
+        </div>
+      </aside>
+
+    </main>
+
+  </div>
+
+  <!-- User Notification History Modal -->
+  <div id="user-history-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="modal-user-title">📜 All SMS & Notification History</h2>
+          <p id="modal-user-subtitle" class="modal-subtitle">Loading user details...</p>
+        </div>
+        <button id="btn-close-modal" class="btn-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-filter-bar">
+          <input type="text" id="modal-search-input" placeholder="Search inside all notifications (OTP, Bank alert, SMS text)..." />
+          <span id="modal-count-badge" class="count-badge">0 Notifications</span>
+        </div>
+
+        <div id="modal-history-list" class="modal-history-list">
+          <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <h3>No Notifications Found for This User</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
