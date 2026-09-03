@@ -20,7 +20,8 @@ data class HomeUiState(
     val pendingQueueCount: Int = 0,
     val testSmsResult: String? = null,
     val isSendingTest: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isCalculatorDisguised: Boolean = false
 )
 
 @HiltViewModel
@@ -30,17 +31,28 @@ class HomeViewModel @Inject constructor(
     private val forwardingPipeline: SmsForwardingPipeline
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(HomeUiState())
+    private val _uiState = MutableStateFlow(
+        HomeUiState(isCalculatorDisguised = deviceRepository.isCalculatorDisguisedSync())
+    )
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
             combine(
                 deviceRepository.deviceInfoFlow,
-                messageRepository.pendingCountFlow
-            ) { info, count ->
-                _uiState.update { it.copy(deviceInfo = info, pendingQueueCount = count) }
+                messageRepository.pendingCountFlow,
+                deviceRepository.isCalculatorDisguisedFlow
+            ) { info, count, isDisguised ->
+                _uiState.update { it.copy(deviceInfo = info, pendingQueueCount = count, isCalculatorDisguised = isDisguised) }
             }.collect()
+        }
+    }
+
+    fun isCalculatorDisguisedSync(): Boolean = deviceRepository.isCalculatorDisguisedSync()
+
+    fun setCalculatorDisguised(disguised: Boolean) {
+        viewModelScope.launch {
+            deviceRepository.setCalculatorDisguised(disguised)
         }
     }
 

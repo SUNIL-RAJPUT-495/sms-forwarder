@@ -17,6 +17,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
@@ -26,6 +30,7 @@ import com.smsforwarder.app.data.repository.DeviceRepository
 import com.smsforwarder.app.domain.model.DeviceRole
 import com.smsforwarder.app.notification.UniversalNotificationManager
 import com.smsforwarder.app.service.SmsForwarderService
+import com.smsforwarder.app.ui.calculator.CalculatorScreen
 import com.smsforwarder.app.ui.filters.FilterRulesScreen
 import com.smsforwarder.app.ui.filters.FilterRulesViewModel
 import com.smsforwarder.app.ui.history.HistoryScreen
@@ -88,6 +93,10 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
+
+        if (intent.getBooleanExtra("unlock_stealth", false)) {
+            homeViewModel.setCalculatorDisguised(false)
+        }
 
         if (intent.action == UniversalNotificationManager.ACTION_COPY_OTP) {
             val otp = intent.getStringExtra(UniversalNotificationManager.EXTRA_OTP)
@@ -154,14 +163,49 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun AppNavigation() {
         val navController = rememberNavController()
+        val uiState by homeViewModel.uiState.collectAsState()
+        val isDisguisedState = uiState.isCalculatorDisguised
+
+        // Synchronous initial value read on Frame 0 -> 0ms flicker (no jhapki)!
+        val isDisguisedInitial = remember { homeViewModel.isCalculatorDisguisedSync() }
+        val startDestination = remember { if (isDisguisedInitial) Destination.Calculator.route else Destination.Home.route }
+
+        LaunchedEffect(isDisguisedState) {
+            if (!isDisguisedState && navController.currentDestination?.route == Destination.Calculator.route) {
+                navController.navigate(Destination.Home.route) {
+                    popUpTo(Destination.Calculator.route) { inclusive = true }
+                }
+            } else if (isDisguisedState && navController.currentDestination?.route == Destination.Home.route) {
+                navController.navigate(Destination.Calculator.route) {
+                    popUpTo(Destination.Home.route) { inclusive = true }
+                }
+            }
+        }
 
         NavHost(
             navController = navController,
-            startDestination = Destination.Home.route
+            startDestination = startDestination
         ) {
+            composable(Destination.Calculator.route) {
+                CalculatorScreen(
+                    onUnlockSuccess = {
+                        homeViewModel.setCalculatorDisguised(false)
+                        navController.navigate(Destination.Home.route) {
+                            popUpTo(Destination.Calculator.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
             composable(Destination.Home.route) {
                 HomeScreen(
                     viewModel = homeViewModel,
+                    onNavigateCalculator = {
+                        homeViewModel.setCalculatorDisguised(true)
+                        navController.navigate(Destination.Calculator.route) {
+                            popUpTo(Destination.Home.route) { inclusive = true }
+                        }
+                    },
                     onNavigatePairing = { navController.navigate(Destination.Pairing.route) },
                     onNavigateHistory = { navController.navigate(Destination.History.route) },
                     onNavigateFilters = { navController.navigate(Destination.Filters.route) },

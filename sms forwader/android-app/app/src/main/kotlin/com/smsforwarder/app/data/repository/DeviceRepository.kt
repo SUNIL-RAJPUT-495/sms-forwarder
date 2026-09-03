@@ -45,6 +45,24 @@ class DeviceRepository @Inject constructor(
         val KEY_PAIRED_DEVICE_ID = stringPreferencesKey("paired_device_id")
         val KEY_PAIRED_DEVICE_NAME = stringPreferencesKey("paired_device_name")
         val KEY_PAIRED_PUBLIC_KEY = stringPreferencesKey("paired_public_key")
+        val KEY_IS_CALCULATOR_DISGUISED = booleanPreferencesKey("is_calculator_disguised")
+    }
+
+    private val fastPrefs = context.getSharedPreferences("fast_app_settings", Context.MODE_PRIVATE)
+
+    fun isCalculatorDisguisedSync(): Boolean {
+        return fastPrefs.getBoolean("is_calculator_disguised", false)
+    }
+
+    val isCalculatorDisguisedFlow: Flow<Boolean> = context.deviceDataStore.data.map { prefs ->
+        prefs[KEY_IS_CALCULATOR_DISGUISED] ?: fastPrefs.getBoolean("is_calculator_disguised", false)
+    }
+
+    suspend fun setCalculatorDisguised(disguised: Boolean) {
+        fastPrefs.edit().putBoolean("is_calculator_disguised", disguised).apply()
+        context.deviceDataStore.edit { prefs ->
+            prefs[KEY_IS_CALCULATOR_DISGUISED] = disguised
+        }
     }
 
     /**

