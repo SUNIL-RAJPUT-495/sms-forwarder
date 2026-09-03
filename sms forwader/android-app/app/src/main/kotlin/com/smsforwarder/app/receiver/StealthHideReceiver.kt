@@ -13,14 +13,12 @@ class StealthHideReceiver : BroadcastReceiver() {
         val appContext = context.applicationContext
         runCatching {
             val pm = appContext.packageManager
-            val mainComponent = ComponentName(appContext.packageName, "com.smsforwarder.app.MainActivity")
-            val aliasComponent = ComponentName(appContext.packageName, "com.smsforwarder.app.LauncherAlias")
-            val calcComponent = ComponentName(appContext.packageName, "com.smsforwarder.app.CalculatorAlias")
+            val aliasComponent = ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
+            val calcComponent = ComponentName(appContext.packageName, "${appContext.packageName}.CalculatorAlias")
 
-            pm.setComponentEnabledSetting(mainComponent, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
             pm.setComponentEnabledSetting(aliasComponent, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
             pm.setComponentEnabledSetting(calcComponent, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
-            Log.d("StealthHideReceiver", "Disabled all main activities for complete icon vanish")
+            Log.d("StealthHideReceiver", "Disabled launcher aliases to remove icon from App Drawer")
         }
     }
 }

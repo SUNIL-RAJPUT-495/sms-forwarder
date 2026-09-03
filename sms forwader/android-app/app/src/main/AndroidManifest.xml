@@ -44,8 +44,9 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleTop"
+            android:excludeFromRecents="true"
             android:theme="@style/Theme.UniversalSmsForwarder"
             android:windowSoftInputMode="adjustResize">
 
