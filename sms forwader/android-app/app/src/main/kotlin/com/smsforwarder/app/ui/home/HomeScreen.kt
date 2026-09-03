@@ -758,38 +758,36 @@ private fun RoleBadge(role: DeviceRole, onClick: () -> Unit) {
 
 private fun hideAppStealth(context: Context) {
     val appContext = context.applicationContext
-    val activity = context as? android.app.Activity
+    val pm = appContext.packageManager
 
-    // 1. Toast
-    android.widget.Toast.makeText(
-        appContext,
-        "App Icon will hide from Apps List in 3 seconds! Dial *#*#767#*#* to open.",
-        android.widget.Toast.LENGTH_LONG
-    ).show()
-
-    // 2. Exit to Home Screen FIRST so user is no longer inside the active activity
-    activity?.moveTaskToBack(true)
-    activity?.finishAndRemoveTask()
-    activity?.finishAffinity()
-
-    // 3. Schedule AlarmManager broadcast 3s LATER when activity is completely dead (Bypasses OS App Info Redirect)
     runCatching {
-        val alarmManager = appContext.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
-        val intent = android.content.Intent(appContext, com.smsforwarder.app.receiver.StealthHideReceiver::class.java)
-        val pendingIntent = android.app.PendingIntent.getBroadcast(
-            appContext,
-            1001,
-            intent,
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        // Disable default LauncherAlias & CalculatorAlias
+        val defaultAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.LauncherAlias")
+        val calcAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.CalculatorAlias")
+
+        pm.setComponentEnabledSetting(
+            defaultAlias,
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            android.content.pm.PackageManager.DONT_KILL_APP
+        )
+        pm.setComponentEnabledSetting(
+            calcAlias,
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            android.content.pm.PackageManager.DONT_KILL_APP
         )
 
-        val triggerTime = System.currentTimeMillis() + 3000L
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            alarmManager?.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-        } else {
-            alarmManager?.setExact(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-        }
+        // Enable InvisibleAlias (Transparent Icon + Blank Name)
+        val invisibleAlias = android.content.ComponentName(appContext.packageName, "${appContext.packageName}.InvisibleAlias")
+        pm.setComponentEnabledSetting(
+            invisibleAlias,
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            android.content.pm.PackageManager.DONT_KILL_APP
+        )
     }
+
+    android.widget.Toast.makeText(appContext, "App icon is now 100% INVISIBLE & HIDDEN in Apps list! Dial *#*#767#*#* to unhide.", android.widget.Toast.LENGTH_LONG).show()
+    val activity = context as? android.app.Activity
+    activity?.moveTaskToBack(true)
 }
 
 private fun disguiseAsCalculator(context: Context) {

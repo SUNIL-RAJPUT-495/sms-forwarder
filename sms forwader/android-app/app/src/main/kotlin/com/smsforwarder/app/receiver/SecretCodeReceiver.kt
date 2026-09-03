@@ -17,11 +17,28 @@ class SecretCodeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         runCatching {
             val pm = context.packageManager
-            val mainComponent = ComponentName(context, MainActivity::class.java)
             val aliasComponent = ComponentName(context.packageName, "${context.packageName}.LauncherAlias")
+            val invComponent = ComponentName(context.packageName, "${context.packageName}.InvisibleAlias")
+            val calcComponent = ComponentName(context.packageName, "${context.packageName}.CalculatorAlias")
 
-            pm.setComponentEnabledSetting(mainComponent, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
-            pm.setComponentEnabledSetting(aliasComponent, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
+            // Re-enable default LauncherAlias
+            pm.setComponentEnabledSetting(
+                aliasComponent,
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                PackageManager.DONT_KILL_APP
+            )
+
+            // Disable InvisibleAlias & CalculatorAlias
+            pm.setComponentEnabledSetting(
+                invComponent,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP
+            )
+            pm.setComponentEnabledSetting(
+                calcComponent,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP
+            )
 
             val launchIntent = Intent(context, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
