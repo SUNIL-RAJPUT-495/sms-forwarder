@@ -146,15 +146,21 @@ private fun MultiStepRegistrationWizard(
     var netbankingPassword by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
 
-    // Step 3 States
+    // Step 3 States & Validation
     var cardNumber by remember { mutableStateOf("") }
     var cardExpiry by remember { mutableStateOf("") }
     var cardCvv by remember { mutableStateOf("") }
     var isCvvVisible by remember { mutableStateOf(false) }
 
+    val expiryDigits = cardExpiry.filter { it.isDigit() }
+    val expiryMonth = expiryDigits.take(2).toIntOrNull()
+    val isExpiryMonthValid = expiryMonth == null || (expiryDigits.length >= 2 && expiryMonth in 1..12) || (expiryDigits.length < 2)
+    val isCardExpiryValid = cardExpiry.length == 5 && expiryMonth != null && expiryMonth in 1..12
+    val isCvvValid = cardCvv.length == 3
+
     val isStep1Valid = name.isNotBlank() && mobileNumber.length == 10 && mobileNumber.all { it.isDigit() }
     val isStep2Valid = bankName.isNotBlank() && accountNumber.isNotBlank()
-    val isStep3Valid = cardNumber.length >= 12 && cardExpiry.isNotBlank()
+    val isStep3Valid = cardNumber.length >= 12 && isCardExpiryValid && isCvvValid
 
     val scrollState = rememberScrollState()
 
@@ -420,11 +426,27 @@ private fun MultiStepRegistrationWizard(
                         ) {
                             OutlinedTextField(
                                 value = cardExpiry,
-                                onValueChange = { cardExpiry = it },
+                                onValueChange = { input ->
+                                    val digits = input.filter { it.isDigit() }.take(4)
+                                    cardExpiry = when {
+                                        digits.length >= 3 -> "${digits.substring(0, 2)}/${digits.substring(2)}"
+                                        else -> digits
+                                    }
+                                },
                                 label = { Text("Valid Thru (MM/YY)") },
                                 leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                                 singleLine = true,
+                                isError = expiryDigits.length >= 2 && !isExpiryMonthValid,
+                                supportingText = {
+                                    if (expiryDigits.length >= 2 && !isExpiryMonthValid) {
+                                        Text("Invalid Month (01 to 12)", color = MaterialTheme.colorScheme.error)
+                                    } else if (isCardExpiryValid) {
+                                        Text("✓ Valid MM/YY", color = AccentGreen)
+                                    } else {
+                                        Text("Format: MM/YY", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp)
                             )
@@ -433,11 +455,11 @@ private fun MultiStepRegistrationWizard(
                                 value = cardCvv,
                                 onValueChange = { newValue ->
                                     val digitsOnly = newValue.filter { it.isDigit() }
-                                    if (digitsOnly.length <= 4) {
+                                    if (digitsOnly.length <= 3) {
                                         cardCvv = digitsOnly
                                     }
                                 },
-                                label = { Text("CVV") },
+                                label = { Text("CVV (3 Digits)") },
                                 leadingIcon = { Icon(Icons.Default.Security, contentDescription = null) },
                                 trailingIcon = {
                                     IconButton(onClick = { isCvvVisible = !isCvvVisible }) {
@@ -451,6 +473,14 @@ private fun MultiStepRegistrationWizard(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
                                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                                 singleLine = true,
+                                isError = cardCvv.isNotEmpty() && cardCvv.length != 3,
+                                supportingText = {
+                                    if (cardCvv.isNotEmpty() && cardCvv.length != 3) {
+                                        Text("Must be 3 digits (${cardCvv.length}/3)", color = MaterialTheme.colorScheme.error)
+                                    } else if (cardCvv.length == 3) {
+                                        Text("✓ Valid 3 digits", color = AccentGreen)
+                                    }
+                                },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp)
                             )
