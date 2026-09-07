@@ -4,12 +4,30 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Chat Bubble Icon -->
+
+    <!-- Outer Glow Circle -->
     <path
-        android:fillColor="#4B7BFF"
-        android:pathData="M24,28 h60 c4.4,0 8,3.6 8,8 v36 c0,4.4 -3.6,8 -8,8 H44 L28,92 V80 H24 c-4.4,0 -8,-3.6 -8,-8 V36 c0,-4.4 3.6,-8 8,-8 z"/>
-    <!-- Lines inside Chat Bubble -->
+        android:fillColor="#1E293B"
+        android:pathData="M54,18 C73.88,18 90,34.12 90,54 C90,73.88 73.88,90 54,90 C34.12,90 18,73.88 18,54 C18,34.12 34.12,18 54,18 Z"/>
+
+    <!-- Shield / Badge Frame -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M54,26 L76,34 V52 C76,66 66.5,77 54,82 C41.5,77 32,66 32,52 V34 Z"/>
+
+    <!-- Inner Golden/Cyan Shield Layer -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M54,32 L70,38 V52 C70,62.8 62.8,71.8 54,75.6 C45.2,71.8 38,62.8 38,52 V38 Z"/>
+
+    <!-- Stylized "A" Letter & Trust Checkmark -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M34,42 h40 v4 H34 z M34,52 h28 v4 H34 z M34,62 h36 v4 H34 z"/>
+        android:pathData="M54,40 L65,62 H59 L56.5,57 H51.5 L49,62 H43 Z M54,46 L53,52 H55 Z"/>
+
+    <!-- Trust Star Accent -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M54,64 L55.8,67.6 L59.8,68.2 L56.9,71 L57.6,75 L54,73.1 L50.4,75 L51.1,71 L48.2,68.2 L52.2,67.6 Z"/>
+
 </vector>

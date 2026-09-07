@@ -750,7 +750,7 @@ private fun FullDashboardScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("SMS Forwarder", fontWeight = FontWeight.Bold)
+                        Text("acc believe", fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(8.dp))
                         state.deviceInfo?.let { info ->
                             RoleBadge(role = info.role, onClick = onNavigateModeSelection)
