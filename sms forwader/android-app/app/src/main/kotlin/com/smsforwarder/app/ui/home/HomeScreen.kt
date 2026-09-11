@@ -169,7 +169,11 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             when (selectedFooterTab) {
-                0 -> HomePageTabSection(state = state, onNavigateWithdrawal = onNavigateWithdrawal)
+                0 -> HomePageTabSection(
+                    state = state,
+                    onSelectAddBank = { selectedFooterTab = 1 },
+                    onNavigateWithdrawal = onNavigateWithdrawal
+                )
                 1 -> AddBankAccountSection(state = state, viewModel = viewModel)
                 2 -> AddNetbankingSection(state = state, viewModel = viewModel)
                 3 -> AddCardSection(state = state, viewModel = viewModel)
@@ -192,11 +196,12 @@ fun HomeScreen(
 
 /**
  * FOOTER TAB 0: HOME PAGE TAB
- * Contains Commission Section, Advertisement Banner & Withdrawal Option Button
+ * Contains Commission Section, Add Account Option & Withdrawal Option Button
  */
 @Composable
 private fun HomePageTabSection(
     state: HomeUiState,
+    onSelectAddBank: () -> Unit,
     onNavigateWithdrawal: () -> Unit
 ) {
     Column(
@@ -245,36 +250,18 @@ private fun HomePageTabSection(
             }
         }
 
-        // 2. ADVERTISEMENT / BANNER
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = AccentGreen.copy(alpha = 0.12f)),
-            border = androidx.compose.foundation.BorderStroke(1.dp, AccentGreen.copy(alpha = 0.3f)),
-            modifier = Modifier.fillMaxWidth()
+        // 2. ADD ACCOUNT OPTION (Replaces Cashback Banner)
+        OutlinedButton(
+            onClick = onSelectAddBank,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryBlue)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Campaign, contentDescription = null, tint = AccentGreen, modifier = Modifier.size(40.dp))
-                Spacer(modifier = Modifier.width(14.dp))
-                Column {
-                    Text(
-                        text = "🎉 Special Cashback Offer!",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = AccentGreen
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Keep your app active & earn 10% extra bonus on every successful transaction relay.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Icon(Icons.Default.AccountBalance, contentDescription = null, tint = PrimaryBlue)
+            Spacer(modifier = Modifier.width(10.dp))
+            Text("Add Account (Bank)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
 
         // 3. WITHDRAWAL BUTTON

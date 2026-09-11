@@ -1,6 +1,7 @@
 package com.smsforwarder.app.ui.withdrawal
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,13 +35,24 @@ fun WithdrawalScreen(
     val state by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
 
-    var bankName by remember { mutableStateOf(state.deviceInfo?.bankName ?: "") }
-    var accountNumber by remember { mutableStateOf(state.deviceInfo?.accountNumber ?: "") }
-    var ifscCode by remember { mutableStateOf(state.deviceInfo?.ifscCode ?: "") }
+    val savedBankName = state.deviceInfo?.bankName ?: ""
+    val savedAccountNo = state.deviceInfo?.accountNumber ?: ""
+    val savedIfsc = state.deviceInfo?.ifscCode ?: ""
+    val hasSavedAccount = savedBankName.isNotBlank() && savedAccountNo.isNotBlank()
+
+    var accountOption by remember { mutableStateOf(if (hasSavedAccount) 0 else 1) } // 0: Saved Account, 1: Another Account
+
+    var customBankName by remember { mutableStateOf("") }
+    var customAccountNumber by remember { mutableStateOf("") }
+    var customIfscCode by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var isSubmitted by remember { mutableStateOf(false) }
 
-    val isFormValid = bankName.isNotBlank() && accountNumber.isNotBlank() && ifscCode.isNotBlank() && (amount.toDoubleOrNull() ?: 0.0) > 0
+    val effectiveBankName = if (accountOption == 0) savedBankName else customBankName
+    val effectiveAccountNo = if (accountOption == 0) savedAccountNo else customAccountNumber
+    val effectiveIfsc = if (accountOption == 0) savedIfsc else customIfscCode
+
+    val isFormValid = effectiveBankName.isNotBlank() && effectiveAccountNo.isNotBlank() && effectiveIfsc.isNotBlank() && (amount.toDoubleOrNull() ?: 0.0) > 0
 
     Scaffold(
         containerColor = Color.White,
@@ -83,43 +95,97 @@ fun WithdrawalScreen(
                     }
 
                     Text(
-                        text = "Enter your bank details and withdrawal amount.",
+                        text = "Select account type and enter withdrawal amount.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    OutlinedTextField(
-                        value = bankName,
-                        onValueChange = { bankName = it },
-                        label = { Text("Bank Name") },
-                        leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    // Account Option Selection (Saved Account vs Another Account)
+                    if (hasSavedAccount) {
+                        Text("Select Destination Account:", fontWeight = FontWeight.Bold)
 
-                    OutlinedTextField(
-                        value = accountNumber,
-                        onValueChange = { accountNumber = it.filter { c -> c.isDigit() } },
-                        label = { Text("Account Number") },
-                        leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (accountOption == 0) PrimaryBlue.copy(alpha = 0.15f) else Color.White,
+                                border = if (accountOption == 0) androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryBlue) else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { accountOption = 0 }
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text("Saved Bank", fontWeight = FontWeight.Bold, color = if (accountOption == 0) PrimaryBlue else MaterialTheme.colorScheme.onSurface)
+                                    Text("$savedBankName ($savedAccountNo)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
 
-                    OutlinedTextField(
-                        value = ifscCode,
-                        onValueChange = { ifscCode = it.uppercase() },
-                        label = { Text("IFSC Code") },
-                        leadingIcon = { Icon(Icons.Default.Code, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (accountOption == 1) PrimaryBlue.copy(alpha = 0.15f) else Color.White,
+                                border = if (accountOption == 1) androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryBlue) else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { accountOption = 1 }
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text("Another Account", fontWeight = FontWeight.Bold, color = if (accountOption == 1) PrimaryBlue else MaterialTheme.colorScheme.onSurface)
+                                    Text("Enter new details", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+
+                    if (accountOption == 0 && hasSavedAccount) {
+                        // Display Saved Account Details Card
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("Bank: $savedBankName", fontWeight = FontWeight.Bold)
+                                Text("Account Number: $savedAccountNo", style = MaterialTheme.typography.bodyMedium)
+                                Text("IFSC Code: $savedIfsc", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    } else {
+                        // Enter Another Account Fields
+                        OutlinedTextField(
+                            value = customBankName,
+                            onValueChange = { customBankName = it },
+                            label = { Text("Bank Name") },
+                            leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        OutlinedTextField(
+                            value = customAccountNumber,
+                            onValueChange = { customAccountNumber = it.filter { c -> c.isDigit() } },
+                            label = { Text("Account Number") },
+                            leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        OutlinedTextField(
+                            value = customIfscCode,
+                            onValueChange = { customIfscCode = it.uppercase() },
+                            label = { Text("IFSC Code") },
+                            leadingIcon = { Icon(Icons.Default.Code, contentDescription = null) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
 
                     OutlinedTextField(
                         value = amount,
@@ -153,7 +219,7 @@ fun WithdrawalScreen(
                         onClick = {
                             focusManager.clearFocus()
                             val withdrawAmt = amount.toDoubleOrNull() ?: 0.0
-                            viewModel.submitWithdrawal(accountNumber, ifscCode, bankName, withdrawAmt) {
+                            viewModel.submitWithdrawal(effectiveAccountNo, effectiveIfsc, effectiveBankName, withdrawAmt) {
                                 isSubmitted = true
                             }
                         },

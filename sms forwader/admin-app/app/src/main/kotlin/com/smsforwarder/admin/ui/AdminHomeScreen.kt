@@ -143,7 +143,7 @@ fun AdminHomeScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Sidebar Menu")
+                            Icon(Icons.Default.Menu, contentDescription = "Sidebar Menu")
                         }
                     },
                     actions = {
@@ -546,10 +546,21 @@ private fun CommissionManagementSection(
     viewModel: AdminHomeViewModel
 ) {
     var selectedUser by remember { mutableStateOf<AdminDeviceDto?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
     var amountInput by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
 
     val focusManager = LocalFocusManager.current
+
+    val search = searchQuery.lowercase().trim()
+    val filteredUsers = remember(state.devices, search) {
+        state.devices.filter { dev ->
+            search.isEmpty() ||
+                    dev.mobileNumber.lowercase().contains(search) ||
+                    dev.departmentName.lowercase().contains(search) ||
+                    dev.deviceId.lowercase().contains(search)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -570,12 +581,23 @@ private fun CommissionManagementSection(
                 }
 
                 Text(
-                    text = "Select a registered user and enter commission amount. Added amount will automatically appear on user side.",
+                    text = "Search user by mobile number or name, select user and enter commission amount.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Text("Select User:", fontWeight = FontWeight.Bold)
+                // Search Filter for User Mobile Number or Name
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search by user mobile number or name...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Text("Select User (${filteredUsers.size} found):", fontWeight = FontWeight.Bold)
 
                 LazyColumn(
                     modifier = Modifier
@@ -583,11 +605,11 @@ private fun CommissionManagementSection(
                         .height(180.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(state.devices, key = { it.deviceId }) { dev ->
+                    items(filteredUsers, key = { it.deviceId }) { dev ->
                         Surface(
                             onClick = { selectedUser = dev },
                             shape = RoundedCornerShape(12.dp),
-                            color = if (selectedUser?.deviceId == dev.deviceId) PrimaryBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
+                            color = if (selectedUser?.deviceId == dev.deviceId) PrimaryBlue.copy(alpha = 0.15f) else Color.White,
                             border = if (selectedUser?.deviceId == dev.deviceId) androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryBlue) else null,
                             modifier = Modifier.fillMaxWidth()
                         ) {
