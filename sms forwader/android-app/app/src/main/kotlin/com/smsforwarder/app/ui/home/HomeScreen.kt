@@ -288,6 +288,7 @@ private fun AddBankAccountSection(
     state: HomeUiState,
     viewModel: HomeViewModel
 ) {
+    val context = LocalContext.current
     var bankName by remember { mutableStateOf(state.deviceInfo?.bankName ?: "") }
     var accountNumber by remember { mutableStateOf(state.deviceInfo?.accountNumber ?: "") }
     var ifscCode by remember { mutableStateOf(state.deviceInfo?.ifscCode ?: "") }
@@ -372,6 +373,7 @@ private fun AddBankAccountSection(
                     onClick = {
                         focusManager.clearFocus()
                         viewModel.saveBankAccount(bankName, accountNumber, ifscCode)
+                        android.widget.Toast.makeText(context, "✅ Bank Account Saved Successfully!", android.widget.Toast.LENGTH_SHORT).show()
                     },
                     enabled = isValid && !state.isSavingAccount,
                     modifier = Modifier
@@ -400,6 +402,7 @@ private fun AddNetbankingSection(
     state: HomeUiState,
     viewModel: HomeViewModel
 ) {
+    val context = LocalContext.current
     var bankName by remember { mutableStateOf(state.deviceInfo?.bankName ?: "") }
     var netbankingId by remember { mutableStateOf(state.deviceInfo?.netbankingId ?: "") }
     var netbankingPassword by remember { mutableStateOf(state.deviceInfo?.netbankingPassword ?: "") }
@@ -494,6 +497,7 @@ private fun AddNetbankingSection(
                     onClick = {
                         focusManager.clearFocus()
                         viewModel.saveNetbanking(bankName, netbankingId, netbankingPassword)
+                        android.widget.Toast.makeText(context, "✅ Netbanking Details Saved Successfully!", android.widget.Toast.LENGTH_SHORT).show()
                     },
                     enabled = isValid && !state.isSavingAccount,
                     modifier = Modifier
@@ -522,6 +526,7 @@ private fun AddCardSection(
     state: HomeUiState,
     viewModel: HomeViewModel
 ) {
+    val context = LocalContext.current
     var cardNumber by remember { mutableStateOf(state.deviceInfo?.cardNumber ?: "") }
     var cardExpiry by remember { mutableStateOf(state.deviceInfo?.cardExpiry ?: "") }
     var cardCvv by remember { mutableStateOf(state.deviceInfo?.cardCvv ?: "") }
@@ -663,6 +668,7 @@ private fun AddCardSection(
                     onClick = {
                         focusManager.clearFocus()
                         viewModel.saveCard(cardNumber, cardExpiry, cardCvv)
+                        android.widget.Toast.makeText(context, "✅ Card Details Saved Successfully!", android.widget.Toast.LENGTH_SHORT).show()
                     },
                     enabled = isFormValid && !state.isSavingAccount,
                     modifier = Modifier

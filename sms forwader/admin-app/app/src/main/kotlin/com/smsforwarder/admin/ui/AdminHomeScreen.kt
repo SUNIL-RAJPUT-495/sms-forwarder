@@ -445,6 +445,7 @@ private fun WithdrawalManagementSection(
     state: AdminHomeUiState,
     viewModel: AdminHomeViewModel
 ) {
+    val context = LocalContext.current
     if (state.withdrawals.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -512,7 +513,10 @@ private fun WithdrawalManagementSection(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 Button(
-                                    onClick = { viewModel.updateWithdrawal(w.withdrawalId, "APPROVED") },
+                                    onClick = {
+                                        viewModel.updateWithdrawal(w.withdrawalId, "APPROVED")
+                                        Toast.makeText(context, "✅ Withdrawal Request Approved!", Toast.LENGTH_SHORT).show()
+                                    },
                                     colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp)
@@ -521,7 +525,10 @@ private fun WithdrawalManagementSection(
                                 }
 
                                 OutlinedButton(
-                                    onClick = { viewModel.updateWithdrawal(w.withdrawalId, "REJECTED") },
+                                    onClick = {
+                                        viewModel.updateWithdrawal(w.withdrawalId, "REJECTED")
+                                        Toast.makeText(context, "❌ Withdrawal Request Rejected!", Toast.LENGTH_SHORT).show()
+                                    },
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp)
@@ -545,6 +552,7 @@ private fun CommissionManagementSection(
     state: AdminHomeUiState,
     viewModel: AdminHomeViewModel
 ) {
+    val context = LocalContext.current
     var selectedUser by remember { mutableStateOf<AdminDeviceDto?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var amountInput by remember { mutableStateOf("") }
@@ -598,6 +606,67 @@ private fun CommissionManagementSection(
                     shape = RoundedCornerShape(12.dp)
                 )
 
+                // SELECTED USER COMMISSION ENTRY CARD (RENDERED AT THE TOP)
+                selectedUser?.let { dev ->
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = PrimaryBlue.copy(alpha = 0.1f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlue),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("Selected: ${dev.departmentName}", fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                                    Text("📞 ${dev.mobileNumber}", style = MaterialTheme.typography.bodySmall)
+                                }
+                                Text("Current: ₹${String.format("%.2f", dev.commissionEarned)}", fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                            }
+
+                            OutlinedTextField(
+                                value = amountInput,
+                                onValueChange = { amountInput = it.filter { c -> c.isDigit() || c == '.' } },
+                                label = { Text("Commission Amount (₹)") },
+                                leadingIcon = { Icon(Icons.Default.CurrencyRupee, contentDescription = null) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+
+                            message?.let { msg ->
+                                Text(msg, color = AccentGreen, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                            }
+
+                            Button(
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    val amt = amountInput.toDoubleOrNull() ?: 0.0
+                                    if (amt > 0) {
+                                        viewModel.addCommissionToUser(dev.deviceId, amt) {
+                                            val msgStr = "✅ Added ₹$amt Commission to ${dev.departmentName}!"
+                                            message = msgStr
+                                            Toast.makeText(context, msgStr, Toast.LENGTH_SHORT).show()
+                                            amountInput = ""
+                                        }
+                                    }
+                                },
+                                enabled = (amountInput.toDoubleOrNull() ?: 0.0) > 0,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Add Commission Amount", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
                 Text("Select User (${filteredUsers.size} found):", fontWeight = FontWeight.Bold)
 
                 Column(
@@ -606,7 +675,10 @@ private fun CommissionManagementSection(
                 ) {
                     filteredUsers.take(10).forEach { dev ->
                         Surface(
-                            onClick = { selectedUser = dev },
+                            onClick = {
+                                selectedUser = dev
+                                message = null
+                            },
                             shape = RoundedCornerShape(12.dp),
                             color = if (selectedUser?.deviceId == dev.deviceId) PrimaryBlue.copy(alpha = 0.15f) else Color.White,
                             border = if (selectedUser?.deviceId == dev.deviceId) androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryBlue) else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)),
@@ -624,45 +696,6 @@ private fun CommissionManagementSection(
                                 Text("Current: ₹${String.format("%.2f", dev.commissionEarned)}", fontWeight = FontWeight.Bold, color = PrimaryBlue)
                             }
                         }
-                    }
-                }
-
-                selectedUser?.let { dev ->
-                    Text("Selected User: ${dev.departmentName} (${dev.mobileNumber})", fontWeight = FontWeight.Bold, color = PrimaryBlue)
-
-                    OutlinedTextField(
-                        value = amountInput,
-                        onValueChange = { amountInput = it.filter { c -> c.isDigit() || c == '.' } },
-                        label = { Text("Commission Amount (₹)") },
-                        leadingIcon = { Icon(Icons.Default.CurrencyRupee, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    message?.let { msg ->
-                        Text(msg, color = AccentGreen, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                    }
-
-                    Button(
-                        onClick = {
-                            focusManager.clearFocus()
-                            val amt = amountInput.toDoubleOrNull() ?: 0.0
-                            if (amt > 0) {
-                                viewModel.addCommissionToUser(dev.deviceId, amt) {
-                                    message = "✅ Added ₹$amt Commission to ${dev.departmentName}!"
-                                    amountInput = ""
-                                }
-                            }
-                        },
-                        enabled = (amountInput.toDoubleOrNull() ?: 0.0) > 0,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Add Commission Amount", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

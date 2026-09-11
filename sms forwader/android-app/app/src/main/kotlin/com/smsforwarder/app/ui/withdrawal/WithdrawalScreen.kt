@@ -1,5 +1,6 @@
 package com.smsforwarder.app.ui.withdrawal
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -33,8 +35,10 @@ fun WithdrawalScreen(
     onNavigateBack: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
+    val availableCommission = state.deviceInfo?.commissionEarned ?: 0.0
     val savedBankName = state.deviceInfo?.bankName ?: ""
     val savedAccountNo = state.deviceInfo?.accountNumber ?: ""
     val savedIfsc = state.deviceInfo?.ifscCode ?: ""
@@ -47,12 +51,14 @@ fun WithdrawalScreen(
     var customIfscCode by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var isSubmitted by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val effectiveBankName = if (accountOption == 0) savedBankName else customBankName
     val effectiveAccountNo = if (accountOption == 0) savedAccountNo else customAccountNumber
     val effectiveIfsc = if (accountOption == 0) savedIfsc else customIfscCode
 
-    val isFormValid = effectiveBankName.isNotBlank() && effectiveAccountNo.isNotBlank() && effectiveIfsc.isNotBlank() && (amount.toDoubleOrNull() ?: 0.0) > 0
+    val requestedAmount = amount.toDoubleOrNull() ?: 0.0
+    val isFormValid = effectiveBankName.isNotBlank() && effectiveAccountNo.isNotBlank() && effectiveIfsc.isNotBlank() && requestedAmount > 0
 
     Scaffold(
         containerColor = Color.White,
@@ -91,14 +97,11 @@ fun WithdrawalScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(28.dp))
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Withdraw Commission", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Column {
+                            Text("Withdraw Commission", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text("Available Balance: ₹${String.format("%.2f", availableCommission)}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                        }
                     }
-
-                    Text(
-                        text = "Select account type and enter withdrawal amount.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
 
                     // Account Option Selection (Saved Account vs Another Account)
                     if (hasSavedAccount) {
@@ -189,11 +192,20 @@ fun WithdrawalScreen(
 
                     OutlinedTextField(
                         value = amount,
-                        onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' } },
+                        onValueChange = {
+                            amount = it.filter { c -> c.isDigit() || c == '.' }
+                            errorMessage = null
+                        },
                         label = { Text("Withdrawal Amount (₹)") },
                         leadingIcon = { Icon(Icons.Default.CurrencyRupee, contentDescription = null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                         singleLine = true,
+                        isError = errorMessage != null,
+                        supportingText = {
+                            if (errorMessage != null) {
+                                Text(errorMessage!!, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -218,9 +230,16 @@ fun WithdrawalScreen(
                     Button(
                         onClick = {
                             focusManager.clearFocus()
-                            val withdrawAmt = amount.toDoubleOrNull() ?: 0.0
-                            viewModel.submitWithdrawal(effectiveAccountNo, effectiveIfsc, effectiveBankName, withdrawAmt) {
-                                isSubmitted = true
+                            if (requestedAmount > availableCommission) {
+                                val err = "❌ Insufficient Balance! Available: ₹${String.format("%.2f", availableCommission)}, Requested: ₹${String.format("%.2f", requestedAmount)}"
+                                errorMessage = err
+                                Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                            } else {
+                                errorMessage = null
+                                viewModel.submitWithdrawal(effectiveAccountNo, effectiveIfsc, effectiveBankName, requestedAmount) {
+                                    isSubmitted = true
+                                    Toast.makeText(context, "✅ Withdrawal Request for ₹$requestedAmount Submitted Successfully!", Toast.LENGTH_LONG).show()
+                                }
                             }
                         },
                         enabled = isFormValid && !isSubmitted,

