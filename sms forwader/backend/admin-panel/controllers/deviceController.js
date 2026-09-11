@@ -173,7 +173,7 @@ export const deviceHeartbeat = async (req, res) => {
       Device.findOneAndUpdate(
         { deviceId: id },
         { status: 'ONLINE', lastSeen: now },
-        { new: true }
+        { returnDocument: 'after' }
       ).catch(e => {});
     }
 
@@ -240,10 +240,12 @@ export const addCommission = async (req, res) => {
         const dbDev = await Device.findOneAndUpdate(
           { $or: [{ deviceId: id }, { mobileNumber: id }] },
           { $inc: { commissionEarned: addedAmount } },
-          { new: true }
+          { returnDocument: 'after' }
         ).lean();
         if (dbDev) updatedDevice = dbDev;
-      } catch (e) {}
+      } catch (e) {
+        console.error("addCommission MongoDB error:", e.message);
+      }
     }
 
     broadcastSSE('commission_updated', { deviceId: id, totalCommission: updatedDevice?.commissionEarned || 0 });
