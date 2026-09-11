@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
@@ -28,6 +29,8 @@ import com.smsforwarder.app.data.repository.DeviceRepository
 import com.smsforwarder.app.domain.model.DeviceRole
 import com.smsforwarder.app.notification.UniversalNotificationManager
 import com.smsforwarder.app.service.SmsForwarderService
+import com.smsforwarder.app.ui.auth.LoginScreen
+import com.smsforwarder.app.ui.auth.RegisterScreen
 import com.smsforwarder.app.ui.filters.FilterRulesScreen
 import com.smsforwarder.app.ui.filters.FilterRulesViewModel
 import com.smsforwarder.app.ui.history.HistoryScreen
@@ -159,20 +162,51 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun AppNavigation() {
         val navController = rememberNavController()
+        val isLoggedInInitial = remember { deviceRepository.isLoggedInSync() }
+        val startDestination = if (isLoggedInInitial) Destination.Home.route else Destination.Login.route
 
         NavHost(
             navController = navController,
-            startDestination = Destination.Home.route
+            startDestination = startDestination
         ) {
+            composable(Destination.Login.route) {
+                LoginScreen(
+                    viewModel = homeViewModel,
+                    onLoginSuccess = {
+                        startRelayServiceIfSender()
+                        navController.navigate(Destination.Home.route) {
+                            popUpTo(Destination.Login.route) { inclusive = true }
+                        }
+                    },
+                    onNavigateRegister = {
+                        navController.navigate(Destination.Register.route)
+                    }
+                )
+            }
+
+            composable(Destination.Register.route) {
+                RegisterScreen(
+                    viewModel = homeViewModel,
+                    onRegisterSuccess = {
+                        startRelayServiceIfSender()
+                        navController.navigate(Destination.Home.route) {
+                            popUpTo(Destination.Register.route) { inclusive = true }
+                        }
+                    },
+                    onNavigateLogin = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
             composable(Destination.Home.route) {
                 HomeScreen(
                     viewModel = homeViewModel,
-                    onNavigatePairing = { navController.navigate(Destination.Pairing.route) },
-                    onNavigateHistory = { navController.navigate(Destination.History.route) },
-                    onNavigateFilters = { navController.navigate(Destination.Filters.route) },
-                    onNavigateSettings = { navController.navigate(Destination.Settings.route) },
-                    onNavigateBatteryGuide = { navController.navigate(Destination.BatteryGuide.route) },
-                    onNavigateModeSelection = { navController.navigate(Destination.ModeSelection.route) }
+                    onLogout = {
+                        navController.navigate(Destination.Login.route) {
+                            popUpTo(Destination.Home.route) { inclusive = true }
+                        }
+                    }
                 )
             }
 

@@ -1,6 +1,8 @@
 package com.smsforwarder.app.ui.navigation
 
 sealed class Destination(val route: String) {
+    object Login : Destination("login")
+    object Register : Destination("register")
     object Home : Destination("home")
     object Pairing : Destination("pairing")
     object History : Destination("history")

