@@ -112,6 +112,7 @@ class DeviceRepository @Inject constructor(
         if (savedMobile == mobile && savedPass == password) {
             context.deviceDataStore.edit { p -> p[KEY_IS_LOGGED_IN] = true }
             fastPrefs.edit().putBoolean("is_logged_in", true).apply()
+            registerDevice()
             return Result.success(true)
         } else {
             return Result.failure(Exception("Incorrect Mobile Number or Password"))
@@ -169,6 +170,7 @@ class DeviceRepository @Inject constructor(
 
             val response = apiService.submitWithdrawalRequest(request)
             if (response.isSuccessful) {
+                syncDeviceInfo()
                 Result.success(Unit)
             } else {
                 Result.failure(Exception("Withdrawal request failed: ${response.code()}"))
@@ -223,6 +225,32 @@ class DeviceRepository @Inject constructor(
             pairedDeviceName = pairedName,
             pairedDeviceId = pairedId
         )
+    }
+
+    /**
+     * Syncs latest user device info and commission earned balance from backend.
+     */
+    suspend fun syncDeviceInfo() {
+        runCatching {
+            val response = apiService.getDevices()
+            if (response.isSuccessful && response.body() != null) {
+                val prefs = context.deviceDataStore.data.first()
+                val currentDeviceId = prefs[KEY_DEVICE_ID] ?: ""
+                val currentMobile = prefs[KEY_MOBILE_NUMBER] ?: ""
+
+                val myDevice = response.body()!!.find {
+                    (currentDeviceId.isNotBlank() && it.deviceId == currentDeviceId) ||
+                    (currentMobile.isNotBlank() && currentMobile != "N/A" && it.mobileNumber == currentMobile)
+                }
+
+                if (myDevice != null) {
+                    context.deviceDataStore.edit { p ->
+                        if (myDevice.deviceId.isNotBlank()) p[KEY_DEVICE_ID] = myDevice.deviceId
+                        p[KEY_COMMISSION_EARNED] = myDevice.commissionEarned
+                    }
+                }
+            }
+        }
     }
 
     suspend fun setDeviceRole(role: DeviceRole) {
@@ -298,7 +326,9 @@ class DeviceRepository @Inject constructor(
                 context.deviceDataStore.edit { p ->
                     p[KEY_DEVICE_ID] = body.deviceId
                     p[KEY_IS_REGISTERED] = true
+                    p[KEY_COMMISSION_EARNED] = body.commissionEarned
                 }
+                syncDeviceInfo()
                 Result.success(body.deviceId)
             } else {
                 Result.failure(Exception("Registration failed: ${response.code()} ${response.message()}"))

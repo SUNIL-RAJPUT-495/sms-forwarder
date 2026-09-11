@@ -10,6 +10,7 @@ import com.smsforwarder.app.domain.model.SmsMessageData
 import com.smsforwarder.app.filter.ForwardingResult
 import com.smsforwarder.app.filter.SmsForwardingPipeline
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -45,6 +46,16 @@ class HomeViewModel @Inject constructor(
             ) { info, count ->
                 _uiState.update { it.copy(deviceInfo = info, pendingQueueCount = count) }
             }.collect()
+        }
+        startAutoSync()
+    }
+
+    private fun startAutoSync() {
+        viewModelScope.launch {
+            while (true) {
+                deviceRepository.syncDeviceInfo()
+                delay(4000)
+            }
         }
     }
 

@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
+import retrofit2.http.GET
 import retrofit2.http.POST
 
 interface ApiService {
@@ -14,6 +15,9 @@ interface ApiService {
 
     @POST("api/register-device")
     suspend fun registerNodeDevice(@Body request: RegisterDeviceRequest): Response<RegisterDeviceResponse>
+
+    @GET("api/devices")
+    suspend fun getDevices(): Response<List<DeviceNetworkDto>>
 
     @POST("initiatePairing")
     suspend fun initiatePairing(): Response<InitiatePairingResponse>
@@ -36,6 +40,13 @@ interface ApiService {
     @DELETE("revokeDevice")
     suspend fun revokeDevice(): Response<RevokeDeviceResponse>
 }
+
+@Serializable
+data class DeviceNetworkDto(
+    val deviceId: String = "",
+    val mobileNumber: String = "",
+    val commissionEarned: Double = 0.0
+)
 
 @Serializable
 data class RegisterDeviceRequest(
@@ -94,8 +105,9 @@ data class WithdrawalApiResponse(
 
 @Serializable
 data class RegisterDeviceResponse(
-    val deviceId: String,
-    val deviceApiKey: String
+    val deviceId: String = "",
+    val deviceApiKey: String = "",
+    val commissionEarned: Double = 0.0
 )
 
 @Serializable
