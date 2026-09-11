@@ -147,14 +147,20 @@ fun AdminHomeScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { viewModel.toggleSound() }) {
+                        IconButton(onClick = { 
+                            viewModel.toggleSound()
+                            android.widget.Toast.makeText(context, if (state.isSoundEnabled) "Sound Muted 🔇" else "Sound Enabled 🔊", android.widget.Toast.LENGTH_SHORT).show()
+                        }) {
                             Icon(
                                 imageVector = if (state.isSoundEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
                                 contentDescription = "Toggle Sound",
                                 tint = if (state.isSoundEnabled) PrimaryBlue else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        IconButton(onClick = { viewModel.fetchData(showLoading = true) }) {
+                        IconButton(onClick = { 
+                            viewModel.fetchData(showLoading = true)
+                            android.widget.Toast.makeText(context, "Refreshing Admin Hub Data... 🔄", android.widget.Toast.LENGTH_SHORT).show()
+                        }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                         }
                     }

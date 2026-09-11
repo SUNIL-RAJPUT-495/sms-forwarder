@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
 import deviceRoutes from './routes/deviceRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 import { registerDevice } from './controllers/deviceController.js';
 import { sendSMS } from './controllers/messageController.js';
 
@@ -32,6 +33,7 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 // Mount Modular API Routes
 app.use('/api', deviceRoutes);
 app.use('/api', messageRoutes);
+app.use('/api', userRoutes);
 
 // Legacy Root Endpoints Compatibility for Android App
 app.post('/registerDevice', registerDevice);

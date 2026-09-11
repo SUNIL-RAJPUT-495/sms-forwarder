@@ -783,8 +783,12 @@ private fun ProfileModalDialog(
                     }
                 }
 
+                val context = LocalContext.current
                 Button(
-                    onClick = onLogout,
+                    onClick = {
+                        android.widget.Toast.makeText(context, "Logged out successfully", android.widget.Toast.LENGTH_SHORT).show()
+                        onLogout()
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     modifier = Modifier
                         .fillMaxWidth()

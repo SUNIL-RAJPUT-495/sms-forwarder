@@ -68,10 +68,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function initSoundToggle() {
+    if (!soundToggleBtn) return;
     soundToggleBtn.addEventListener('click', () => {
       soundEnabled = !soundEnabled;
       soundToggleBtn.innerHTML = soundEnabled ? `<span>🔊</span> Sound ON` : `<span>🔇</span> Sound OFF`;
       if (soundEnabled) playNotificationSound();
+      showToast(soundEnabled ? 'Audio notifications enabled 🔊' : 'Audio notifications muted 🔇', 'info');
     });
   }
 
@@ -96,21 +98,21 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Update UI components
       renderLiveFeedItem(msg);
-      fetchDevices(); // Refresh notification counts on user cards
+      fetchDevices();
       updateStats();
       playNotificationSound();
 
-      // If history modal is currently open for this user, refresh modal list
       if (selectedUserForModal && 
          (selectedUserForModal.departmentName === msg.departmentName || selectedUserForModal.mobileNumber === msg.mobileNumber)) {
         renderModalHistory();
       }
 
-      showToast(`Notification for ${msg.departmentName}: ${msg.sender}`);
+      showToast(`Notification received from ${msg.departmentName} (${msg.sender})`, 'success');
     });
 
     sseEventSource.addEventListener('device_registered', () => {
       fetchDevices();
+      showToast('New user device connected! 📲', 'info');
     });
 
     sseEventSource.addEventListener('device_ping', () => {
@@ -142,11 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {}
   }
 
-  // ─────────────────────────────────────────────
-  // RENDER USERS DIRECTORY GRID (Primary Focus)
-  // ─────────────────────────────────────────────
   function renderUsersGrid() {
-    const searchTerm = userSearchInput.value.toLowerCase().trim();
+    const searchTerm = userSearchInput ? userSearchInput.value.toLowerCase().trim() : '';
 
     const filteredUsers = allDevices.filter(dev => {
       return !searchTerm ||
@@ -156,72 +155,71 @@ document.addEventListener('DOMContentLoaded', () => {
         dev.address.toLowerCase().includes(searchTerm);
     });
 
-    devicesCountBadge.textContent = `${allDevices.length} Registered`;
+    if (devicesCountBadge) devicesCountBadge.textContent = `${allDevices.length} Registered`;
 
     if (filteredUsers.length === 0) {
-      emptyDevicesState.style.display = 'flex';
-      usersGrid.querySelectorAll('.user-card').forEach(el => el.remove());
+      if (emptyDevicesState) emptyDevicesState.style.display = 'flex';
+      if (usersGrid) usersGrid.querySelectorAll('.user-card').forEach(el => el.remove());
       return;
     }
 
-    emptyDevicesState.style.display = 'none';
-    usersGrid.querySelectorAll('.user-card').forEach(el => el.remove());
+    if (emptyDevicesState) emptyDevicesState.style.display = 'none';
+    if (usersGrid) {
+      usersGrid.querySelectorAll('.user-card').forEach(el => el.remove());
 
-    filteredUsers.forEach(dev => {
-      // Calculate ALL notifications for this specific user
-      const userNotifications = allMessages.filter(m => 
-        m.deviceId === dev.deviceId || 
-        m.mobileNumber === dev.mobileNumber || 
-        m.departmentName.toLowerCase() === dev.departmentName.toLowerCase()
-      );
+      filteredUsers.forEach(dev => {
+        const userNotifications = allMessages.filter(m => 
+          m.deviceId === dev.deviceId || 
+          m.mobileNumber === dev.mobileNumber || 
+          m.departmentName.toLowerCase() === dev.departmentName.toLowerCase()
+        );
 
-      const card = document.createElement('div');
-      card.className = 'user-card';
-      card.innerHTML = `
-        <div class="user-card-header">
-          <div style="display: flex; align-items: center;">
-            <div class="user-avatar">👤</div>
-            <div class="user-details">
-              <span class="user-name">${escapeHTML(dev.departmentName)}</span>
-              <span class="user-mobile">📞 ${escapeHTML(dev.mobileNumber)}</span>
+        const card = document.createElement('div');
+        card.className = 'user-card';
+        card.innerHTML = `
+          <div class="user-card-header">
+            <div style="display: flex; align-items: center;">
+              <div class="user-avatar">👤</div>
+              <div class="user-details">
+                <span class="user-name">${escapeHTML(dev.departmentName)}</span>
+                <span class="user-mobile">📞 ${escapeHTML(dev.mobileNumber)}</span>
+              </div>
             </div>
+            <span class="user-status-pill ${dev.isOnline ? 'online' : 'offline'}">
+              ${dev.isOnline ? 'ONLINE' : 'OFFLINE'}
+            </span>
           </div>
-          <span class="user-status-pill ${dev.isOnline ? 'online' : 'offline'}">
-            ${dev.isOnline ? 'ONLINE' : 'OFFLINE'}
-          </span>
-        </div>
 
-        <div class="user-card-body">
-          <span>📍 <strong>Address:</strong> ${escapeHTML(dev.address || 'Main Office')}</span>
-          <span>🕒 <strong>Last Active:</strong> ${formatTimeAgo(dev.lastSeen)}</span>
-        </div>
+          <div class="user-card-body">
+            <span>📍 <strong>Address:</strong> ${escapeHTML(dev.address || 'Main Office')}</span>
+            <span>🕒 <strong>Last Active:</strong> ${formatTimeAgo(dev.lastSeen)}</span>
+          </div>
 
-        <div class="user-card-footer">
-          <span class="noti-badge">📩 ${userNotifications.length} Notifications</span>
-          <span class="btn-view-history">👁️ View All Notifications &rarr;</span>
-        </div>
-      `;
+          <div class="user-card-footer">
+            <span class="noti-badge">📩 ${userNotifications.length} Notifications</span>
+            <span class="btn-view-history">👁️ View All Notifications &rarr;</span>
+          </div>
+        `;
 
-      // Click event to open User Notification History Modal
-      card.addEventListener('click', () => {
-        openUserHistoryModal(dev);
+        card.addEventListener('click', () => {
+          showToast(`Opening details for ${dev.departmentName}`, 'info');
+          openUserHistoryModal(dev);
+        });
+
+        usersGrid.appendChild(card);
       });
-
-      usersGrid.appendChild(card);
-    });
+    }
   }
 
-  // ─────────────────────────────────────────────
-  // RENDER LIVE FEED COLUMN
-  // ─────────────────────────────────────────────
   function renderLiveFeed() {
+    if (!liveFeedContainer) return;
     if (allMessages.length === 0) {
-      emptyOtpState.style.display = 'flex';
+      if (emptyOtpState) emptyOtpState.style.display = 'flex';
       liveFeedContainer.querySelectorAll('.live-card').forEach(el => el.remove());
       return;
     }
 
-    emptyOtpState.style.display = 'none';
+    if (emptyOtpState) emptyOtpState.style.display = 'none';
     liveFeedContainer.querySelectorAll('.live-card').forEach(el => el.remove());
 
     allMessages.slice(0, 15).forEach(msg => {
@@ -230,7 +228,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderLiveFeedItem(msg, isNew = true) {
-    emptyOtpState.style.display = 'none';
+    if (!liveFeedContainer) return;
+    if (emptyOtpState) emptyOtpState.style.display = 'none';
     const card = document.createElement('div');
     card.className = `live-card ${msg.otp ? 'has-otp' : ''}`;
     
@@ -264,9 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ─────────────────────────────────────────────
-  // USER ALL NOTIFICATION HISTORY MODAL HANDLERS
-  // ─────────────────────────────────────────────
   function openUserHistoryModal(device) {
     selectedUserForModal = device;
     modalUserTitle.textContent = `📜 ${device.departmentName} - All Notifications`;
@@ -282,7 +278,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const searchTerm = modalSearchInput.value.toLowerCase().trim();
 
-    // Filter messages specifically for selected user
     const userMessages = allMessages.filter(m => {
       const isUserMsg = m.deviceId === selectedUserForModal.deviceId ||
                          m.mobileNumber === selectedUserForModal.mobileNumber ||
@@ -346,98 +341,112 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Event Listeners
   function setupEventListeners() {
-    userSearchInput.addEventListener('input', renderUsersGrid);
-    modalSearchInput.addEventListener('input', renderModalHistory);
+    if (userSearchInput) userSearchInput.addEventListener('input', renderUsersGrid);
+    if (modalSearchInput) modalSearchInput.addEventListener('input', renderModalHistory);
 
-    btnCloseModal.addEventListener('click', () => {
-      userHistoryModal.classList.remove('active');
-      selectedUserForModal = null;
-    });
-
-    userHistoryModal.addEventListener('click', (e) => {
-      if (e.target === userHistoryModal) {
+    if (btnCloseModal) {
+      btnCloseModal.addEventListener('click', () => {
         userHistoryModal.classList.remove('active');
         selectedUserForModal = null;
-      }
-    });
+        showToast('Notification details closed', 'info');
+      });
+    }
 
-    // Simulate Register User
-    btnSimulateDevice.addEventListener('click', async () => {
-      const sampleDepts = [
-        { name: "Accounts Dept", phone: "+91 98765 11111", address: "Floor 2 - Room 201" },
-        { name: "Sales Team", phone: "+91 98765 22222", address: "Floor 1 - Main Desk" },
-        { name: "HR Department", phone: "+91 98765 33333", address: "Floor 3 - Cabin 4" },
-        { name: "Operations", phone: "+91 98765 44444", address: "Ground Floor - Gate 1" }
-      ];
-      const sample = sampleDepts[Math.floor(Math.random() * sampleDepts.length)];
+    if (userHistoryModal) {
+      userHistoryModal.addEventListener('click', (e) => {
+        if (e.target === userHistoryModal) {
+          userHistoryModal.classList.remove('active');
+          selectedUserForModal = null;
+          showToast('Modal closed', 'info');
+        }
+      });
+    }
 
-      try {
-        await fetch('/api/register-device', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            departmentName: sample.name,
-            mobileNumber: sample.phone,
-            address: sample.address,
-            role: 'SOURCE'
-          })
-        });
-        fetchDevices();
-      } catch (e) {}
-    });
+    if (btnSimulateDevice) {
+      btnSimulateDevice.addEventListener('click', async () => {
+        showToast('Simulating user device registration...', 'info');
+        const sampleDepts = [
+          { name: "Accounts Dept", phone: "+91 98765 11111", address: "Floor 2 - Room 201" },
+          { name: "Sales Team", phone: "+91 98765 22222", address: "Floor 1 - Main Desk" },
+          { name: "HR Department", phone: "+91 98765 33333", address: "Floor 3 - Cabin 4" },
+          { name: "Operations", phone: "+91 98765 44444", address: "Ground Floor - Gate 1" }
+        ];
+        const sample = sampleDepts[Math.floor(Math.random() * sampleDepts.length)];
 
-    // Simulate Notification (Both OTP and Non-OTP Notifications)
-    btnSimulateSms.addEventListener('click', async () => {
-      if (allDevices.length === 0) {
-        btnSimulateDevice.click();
-        await new Promise(r => setTimeout(r, 300));
-      }
+        try {
+          await fetch('/api/register-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              departmentName: sample.name,
+              mobileNumber: sample.phone,
+              address: sample.address,
+              role: 'SOURCE'
+            })
+          });
+          fetchDevices();
+          showToast('User device registered successfully! ✅', 'success');
+        } catch (e) {
+          showToast('Failed to register device: ' + e.message, 'error');
+        }
+      });
+    }
 
-      const randomDev = allDevices[Math.floor(Math.random() * allDevices.length)];
-      
-      const sampleNotifications = [
-        { sender: 'HDFC-BANK', body: 'Your OTP for online payment of Rs. 14,500 at Amazon is 839201. Valid for 10 mins.' },
-        { sender: 'ICICI-ALERT', body: 'Dear Customer, A/c XX8920 has been debited by Rs 2,500.00 on 01-Sep-26. Info: UPI/VendorPay.' },
-        { sender: 'SBI-BANK', body: 'Salary credit of Rs 65,000.00 done in A/c XX4091 on 01-Sep-26. Available Bal: Rs 1,42,900.' },
-        { sender: 'SWIGGY', body: 'Your order #91024 has been delivered to Gate 2 reception by delivery partner.' },
-        { sender: 'RAZORPAY', body: 'Use 492015 as your verification code to complete sign-in to Razorpay Dashboard.' }
-      ];
+    if (btnSimulateSms) {
+      btnSimulateSms.addEventListener('click', async () => {
+        if (allDevices.length === 0) {
+          btnSimulateDevice.click();
+          await new Promise(r => setTimeout(r, 300));
+        }
 
-      const noti = sampleNotifications[Math.floor(Math.random() * sampleNotifications.length)];
+        showToast('Simulating SMS/OTP transmission...', 'info');
+        const randomDev = allDevices[Math.floor(Math.random() * allDevices.length)];
+        
+        const sampleNotifications = [
+          { sender: 'HDFC-BANK', body: 'Your OTP for online payment of Rs. 14,500 at Amazon is 839201. Valid for 10 mins.' },
+          { sender: 'ICICI-ALERT', body: 'Dear Customer, A/c XX8920 has been debited by Rs 2,500.00 on 01-Sep-26. Info: UPI/VendorPay.' },
+          { sender: 'SBI-BANK', body: 'Salary credit of Rs 65,000.00 done in A/c XX4091 on 01-Sep-26. Available Bal: Rs 1,42,900.' },
+          { sender: 'SWIGGY', body: 'Your order #91024 has been delivered to Gate 2 reception by delivery partner.' },
+          { sender: 'RAZORPAY', body: 'Use 492015 as your verification code to complete sign-in to Razorpay Dashboard.' }
+        ];
 
-      try {
-        await fetch('/api/send-sms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceId: randomDev.deviceId,
-            departmentName: randomDev.departmentName,
-            mobileNumber: randomDev.mobileNumber,
-            address: randomDev.address,
-            sender: noti.sender,
-            body: noti.body,
-            timestamp: new Date().toISOString()
-          })
-        });
-      } catch (e) {}
-    });
+        const noti = sampleNotifications[Math.floor(Math.random() * sampleNotifications.length)];
+
+        try {
+          await fetch('/api/send-sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              deviceId: randomDev.deviceId,
+              departmentName: randomDev.departmentName,
+              mobileNumber: randomDev.mobileNumber,
+              address: randomDev.address,
+              sender: noti.sender,
+              body: noti.body,
+              timestamp: new Date().toISOString()
+            })
+          });
+          showToast('SMS / OTP sent to dashboard successfully! ⚡', 'success');
+        } catch (e) {
+          showToast('Failed to send SMS: ' + e.message, 'error');
+        }
+      });
+    }
   }
 
-  // Stats Counters
   function updateStats() {
     const activeCount = allDevices.filter(d => d.isOnline).length;
-    activeDevicesStatEl.textContent = `${activeCount} / ${allDevices.length}`;
-    totalOtpsStatEl.textContent = allMessages.length;
+    if (activeDevicesStatEl) activeDevicesStatEl.textContent = `${activeCount} / ${allDevices.length}`;
+    if (totalOtpsStatEl) totalOtpsStatEl.textContent = allMessages.length;
   }
 
-  // Global Copy Helper
   window.copyToClipboard = function(text, btnElement) {
     navigator.clipboard.writeText(text).then(() => {
       const originalText = btnElement.innerHTML;
       btnElement.innerHTML = `✓ COPIED!`;
       btnElement.style.background = '#059669';
+      showToast('Copied to clipboard! 📋', 'success');
       setTimeout(() => {
         btnElement.innerHTML = originalText;
         btnElement.style.background = '';
@@ -460,16 +469,34 @@ document.addEventListener('DOMContentLoaded', () => {
     return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
   }
 
-  function showToast(message) {
-    const toastContainer = document.getElementById('toast-container');
+  function createToastContainer() {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+    return container;
+  }
+
+  window.showToast = function(message, type = 'info') {
+    const toastContainer = createToastContainer();
     const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.innerHTML = `<span>🔔</span> <span>${escapeHTML(message)}</span>`;
+    toast.className = `toast toast-${type}`;
+    let icon = '🔔';
+    if (type === 'success') icon = '✅';
+    if (type === 'error') icon = '❌';
+    if (type === 'warning') icon = '⚠️';
+    if (type === 'info') icon = 'ℹ️';
+
+    toast.innerHTML = `<span>${icon}</span> <span>${escapeHTML(message)}</span>`;
     toastContainer.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
       toast.style.transform = 'translateX(50px)';
+      toast.style.transition = 'all 0.3s ease';
       setTimeout(() => toast.remove(), 300);
-    }, 4000);
-  }
+    }, 3500);
+  };
 });

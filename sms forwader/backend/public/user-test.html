@@ -35,6 +35,7 @@
       width: 100%;
       max-width: 420px;
       box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      position: relative;
     }
     .header {
       text-align: center;
@@ -78,8 +79,9 @@
       font-weight: 700;
       cursor: pointer;
       margin-top: 10px;
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.1s;
     }
+    .btn:active { transform: scale(0.98); }
     .btn:hover { background: #4f46e5; }
     .btn-green { background: var(--accent); }
     .btn-green:hover { background: #059669; }
@@ -98,6 +100,38 @@
       height: 1px;
       background: rgba(255, 255, 255, 0.1);
       margin: 24px 0;
+    }
+
+    /* Toast Notification CSS */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .toast {
+      background: #1e293b;
+      color: white;
+      border: 1px solid var(--primary);
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      animation: slideInRight 0.3s ease-out;
+    }
+    .toast-success { border-color: #10b981; }
+    .toast-error { border-color: #ef4444; }
+    .toast-warning { border-color: #f59e0b; }
+    .toast-info { border-color: #6366f1; }
+    @keyframes slideInRight {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
     }
   </style>
 </head>
@@ -153,8 +187,30 @@
   <div id="status-box" class="status-box"></div>
 </div>
 
+<div id="toast-container" class="toast-container"></div>
+
 <script>
   let registeredDevice = null;
+
+  function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    let icon = '🔔';
+    if (type === 'success') icon = '✅';
+    if (type === 'error') icon = '❌';
+    if (type === 'warning') icon = '⚠️';
+    if (type === 'info') icon = 'ℹ️';
+
+    toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+    toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(50px)';
+      toast.style.transition = 'all 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 3500);
+  }
 
   document.getElementById('btn-register').addEventListener('click', async () => {
     const deptName = document.getElementById('dept-name').value.trim();
@@ -162,9 +218,11 @@
     const address = document.getElementById('address').value.trim();
 
     if (!deptName || !mobileNo) {
-      alert("Please enter Department Name and Mobile Number");
+      showToast("Please enter Department Name and Mobile Number", "warning");
       return;
     }
+
+    showToast("Registering device...", "info");
 
     try {
       const res = await fetch('/api/register-device', {
@@ -184,20 +242,30 @@
         statusBox.style.display = 'block';
         statusBox.innerHTML = `✓ Registered Successfully!<br><strong>Device ID:</strong> ${registeredDevice.deviceId}`;
         document.getElementById('step-test-sms').style.display = 'block';
+        showToast("Phone Registered Successfully! ✅", "success");
+      } else {
+        showToast("Registration failed on server", "error");
       }
     } catch (err) {
-      alert("Registration failed: " + err.message);
+      showToast("Registration failed: " + err.message, "error");
     }
   });
 
   document.getElementById('btn-send-sms').addEventListener('click', async () => {
     if (!registeredDevice) {
-      alert("Please register first");
+      showToast("Please register first", "warning");
       return;
     }
 
     const sender = document.getElementById('sms-sender').value.trim();
     const body = document.getElementById('sms-body').value.trim();
+
+    if (!sender || !body) {
+      showToast("Please fill sender and body text", "warning");
+      return;
+    }
+
+    showToast("Sending OTP to admin...", "info");
 
     try {
       const res = await fetch('/api/send-sms', {
@@ -219,9 +287,12 @@
         const statusBox = document.getElementById('status-box');
         statusBox.style.display = 'block';
         statusBox.innerHTML = `⚡ OTP Sent to Office Admin Panel!<br><strong>Detected OTP:</strong> ${data.otp || 'None'}`;
+        showToast("OTP Sent to Admin Panel! ⚡", "success");
+      } else {
+        showToast("Failed to send OTP", "error");
       }
     } catch (err) {
-      alert("Failed to send SMS: " + err.message);
+      showToast("Failed to send SMS: " + err.message, "error");
     }
   });
 </script>
