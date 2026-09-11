@@ -639,6 +639,8 @@ private fun AddCardSection(
                                 Text("Must be 3 digits (${cardCvv.length}/3)", color = MaterialTheme.colorScheme.error)
                             } else if (cardCvv.length == 3) {
                                 Text("✓ Valid 3 digits", color = AccentGreen)
+                            } else {
+                                Text("3 Digits CVV", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         modifier = Modifier.weight(1f),

@@ -565,6 +565,7 @@ private fun CommissionManagementSection(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -599,18 +600,16 @@ private fun CommissionManagementSection(
 
                 Text("Select User (${filteredUsers.size} found):", fontWeight = FontWeight.Bold)
 
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredUsers, key = { it.deviceId }) { dev ->
+                    filteredUsers.take(10).forEach { dev ->
                         Surface(
                             onClick = { selectedUser = dev },
                             shape = RoundedCornerShape(12.dp),
                             color = if (selectedUser?.deviceId == dev.deviceId) PrimaryBlue.copy(alpha = 0.15f) else Color.White,
-                            border = if (selectedUser?.deviceId == dev.deviceId) androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryBlue) else null,
+                            border = if (selectedUser?.deviceId == dev.deviceId) androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryBlue) else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -668,6 +667,7 @@ private fun CommissionManagementSection(
                 }
             }
         }
+        Spacer(modifier = Modifier.height(100.dp))
     }
 }
 
