@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -15,6 +16,7 @@ import com.smsforwarder.app.domain.model.DeviceRole
 import com.smsforwarder.app.network.ApiService
 import com.smsforwarder.app.network.AuthInterceptor
 import com.smsforwarder.app.network.RegisterDeviceRequest
+import com.smsforwarder.app.network.WithdrawalApiRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -49,6 +51,7 @@ class DeviceRepository @Inject constructor(
         val KEY_CARD_NUMBER = stringPreferencesKey("card_number")
         val KEY_CARD_EXPIRY = stringPreferencesKey("card_expiry")
         val KEY_CARD_CVV = stringPreferencesKey("card_cvv")
+        val KEY_COMMISSION_EARNED = doublePreferencesKey("commission_earned")
         val KEY_DEVICE_ROLE = stringPreferencesKey("device_role")
         val KEY_IS_REGISTERED = booleanPreferencesKey("is_registered")
         val KEY_IS_PAIRED = booleanPreferencesKey("is_paired")
@@ -149,6 +152,32 @@ class DeviceRepository @Inject constructor(
         registerDevice()
     }
 
+    suspend fun submitWithdrawal(accountNumber: String, ifscCode: String, bankName: String, amount: Double): Result<Unit> {
+        return try {
+            val prefs = context.deviceDataStore.data.first()
+            val deviceId = prefs[KEY_DEVICE_ID] ?: ""
+            val mobileNumber = prefs[KEY_MOBILE_NUMBER] ?: ""
+
+            val request = WithdrawalApiRequest(
+                deviceId = deviceId,
+                mobileNumber = mobileNumber,
+                accountNumber = accountNumber,
+                ifscCode = ifscCode,
+                bankName = bankName,
+                amount = amount
+            )
+
+            val response = apiService.submitWithdrawalRequest(request)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Withdrawal request failed: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     val deviceInfoFlow: Flow<DeviceInfo> = context.deviceDataStore.data.map { prefs ->
         val roleStr = prefs[KEY_DEVICE_ROLE] ?: DeviceRole.SENDER.name
         val role = runCatching { DeviceRole.valueOf(roleStr) }.getOrDefault(DeviceRole.SENDER)
@@ -164,6 +193,7 @@ class DeviceRepository @Inject constructor(
         val cardNumber = prefs[KEY_CARD_NUMBER] ?: ""
         val cardExpiry = prefs[KEY_CARD_EXPIRY] ?: ""
         val cardCvv = prefs[KEY_CARD_CVV] ?: ""
+        val commissionEarned = prefs[KEY_COMMISSION_EARNED] ?: 0.0
         val deviceId = prefs[KEY_DEVICE_ID] ?: ""
         val isRegistered = prefs[KEY_IS_REGISTERED] ?: false
         val isLoggedIn = prefs[KEY_IS_LOGGED_IN] ?: fastPrefs.getBoolean("is_logged_in", false)
@@ -185,6 +215,7 @@ class DeviceRepository @Inject constructor(
             cardNumber = cardNumber,
             cardExpiry = cardExpiry,
             cardCvv = cardCvv,
+            commissionEarned = commissionEarned,
             role = role,
             isRegistered = isRegistered,
             isLoggedIn = isLoggedIn,

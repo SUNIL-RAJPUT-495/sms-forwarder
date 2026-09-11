@@ -3,9 +3,12 @@ package com.smsforwarder.admin.data.repository
 import com.smsforwarder.admin.BuildConfig
 import com.smsforwarder.admin.domain.model.AdminDeviceDto
 import com.smsforwarder.admin.domain.model.AdminMessageDto
+import com.smsforwarder.admin.network.AddCommissionRequest
 import com.smsforwarder.admin.network.AdminApiService
 import com.smsforwarder.admin.network.DirectSmsRequest
 import com.smsforwarder.admin.network.RegisterDeviceRequest
+import com.smsforwarder.admin.network.UpdateWithdrawalStatusRequest
+import com.smsforwarder.admin.network.WithdrawalDto
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -46,6 +49,45 @@ class AdminRepository @Inject constructor(
                 Result.success(response.body()!!)
             } else {
                 Result.failure(Exception("Failed to fetch messages: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchWithdrawals(): Result<List<WithdrawalDto>> {
+        return try {
+            val response = apiService.getWithdrawals()
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Failed to fetch withdrawals: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun addCommission(deviceId: String, amount: Double): Result<Unit> {
+        return try {
+            val response = apiService.addCommission(deviceId, AddCommissionRequest(amount))
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Add commission failed: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateWithdrawalStatus(withdrawalId: String, status: String): Result<Unit> {
+        return try {
+            val response = apiService.updateWithdrawalStatus(withdrawalId, UpdateWithdrawalStatusRequest(status))
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Update status failed: ${response.code()}"))
             }
         } catch (e: Exception) {
             Result.failure(e)

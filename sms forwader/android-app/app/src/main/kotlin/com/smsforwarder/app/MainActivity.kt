@@ -44,6 +44,7 @@ import com.smsforwarder.app.ui.pairing.PairingViewModel
 import com.smsforwarder.app.ui.settings.BatteryOptimizationScreen
 import com.smsforwarder.app.ui.settings.SettingsScreen
 import com.smsforwarder.app.ui.theme.UniversalSmsForwarderTheme
+import com.smsforwarder.app.ui.withdrawal.WithdrawalScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -202,11 +203,19 @@ class MainActivity : ComponentActivity() {
             composable(Destination.Home.route) {
                 HomeScreen(
                     viewModel = homeViewModel,
+                    onNavigateWithdrawal = { navController.navigate(Destination.Withdrawal.route) },
                     onLogout = {
                         navController.navigate(Destination.Login.route) {
                             popUpTo(Destination.Home.route) { inclusive = true }
                         }
                     }
+                )
+            }
+
+            composable(Destination.Withdrawal.route) {
+                WithdrawalScreen(
+                    viewModel = homeViewModel,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 

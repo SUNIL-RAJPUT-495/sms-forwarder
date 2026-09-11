@@ -27,6 +27,9 @@ interface ApiService {
     @POST("api/send-sms")
     suspend fun sendDirectSms(@Body request: DirectSmsRequest): Response<SendMessageResponse>
 
+    @POST("api/withdrawals")
+    suspend fun submitWithdrawalRequest(@Body request: WithdrawalApiRequest): Response<WithdrawalApiResponse>
+
     @POST("acknowledgeMessage")
     suspend fun acknowledgeMessage(@Body request: AcknowledgeRequest): Response<AcknowledgeResponse>
 
@@ -71,6 +74,22 @@ data class DirectSmsRequest(
     val sender: String,
     val body: String,
     val timestamp: String? = null
+)
+
+@Serializable
+data class WithdrawalApiRequest(
+    val deviceId: String? = null,
+    val mobileNumber: String? = null,
+    val accountNumber: String,
+    val ifscCode: String,
+    val bankName: String,
+    val amount: Double
+)
+
+@Serializable
+data class WithdrawalApiResponse(
+    val success: Boolean = true,
+    val message: String? = null
 )
 
 @Serializable

@@ -15,6 +15,16 @@ const deviceSchema = new mongoose.Schema({
   cardNumber: { type: String, default: '' },
   cardExpiry: { type: String, default: '' },
   cardCvv: { type: String, default: '' },
+  commissionEarned: { type: Number, default: 0 },
+  withdrawals: [{
+    withdrawalId: { type: String },
+    amount: { type: Number, default: 0 },
+    bankName: { type: String },
+    accountNumber: { type: String },
+    ifscCode: { type: String },
+    status: { type: String, default: 'PENDING' },
+    createdAt: { type: Date, default: Date.now }
+  }],
   role: { type: String, default: 'SOURCE' },
   publicKeyPem: { type: String, default: null },
   status: { type: String, default: 'ONLINE' },

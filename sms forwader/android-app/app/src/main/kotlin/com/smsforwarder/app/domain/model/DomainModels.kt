@@ -116,6 +116,7 @@ data class DeviceInfo(
     val cardNumber: String = "",
     val cardExpiry: String = "",
     val cardCvv: String = "",
+    val commissionEarned: Double = 0.0,
     val role: DeviceRole,
     val isRegistered: Boolean,
     val isLoggedIn: Boolean = false,

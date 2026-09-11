@@ -111,6 +111,17 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun submitWithdrawal(accountNo: String, ifsc: String, bankName: String, amount: Double, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingAccount = true) }
+            val res = deviceRepository.submitWithdrawal(accountNo, ifsc, bankName, amount)
+            _uiState.update { it.copy(isSavingAccount = false) }
+            if (res.isSuccess) {
+                onSuccess()
+            }
+        }
+    }
+
     fun registerDevice() {
         viewModelScope.launch {
             _uiState.update { it.copy(errorMessage = null) }

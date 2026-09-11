@@ -3,6 +3,7 @@ package com.smsforwarder.app.ui.home
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -33,18 +34,20 @@ import androidx.compose.ui.window.Dialog
 import com.smsforwarder.app.domain.model.DeviceInfo
 import com.smsforwarder.app.ui.theme.AccentGreen
 import com.smsforwarder.app.ui.theme.PrimaryBlue
+import com.smsforwarder.app.ui.theme.WarningAmber
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
+    onNavigateWithdrawal: () -> Unit,
     onLogout: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
     val deviceInfo = state.deviceInfo ?: return
     val context = LocalContext.current
 
-    var selectedFooterTab by remember { mutableStateOf(0) } // 0: Bank Account, 1: Netbanking, 2: Card Details
+    var selectedFooterTab by remember { mutableStateOf(0) } // 0: Home, 1: Add Bank, 2: Add Netbanking, 3: Add Card
     var showProfileDialog by remember { mutableStateOf(false) }
 
     // Auto-prompt Notification Access Permission on entering app if not already granted
@@ -110,8 +113,8 @@ fun HomeScreen(
                 NavigationBarItem(
                     selected = selectedFooterTab == 0,
                     onClick = { selectedFooterTab = 0 },
-                    icon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
-                    label = { Text("Add Bank", fontWeight = FontWeight.Bold) },
+                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                    label = { Text("Home", fontWeight = FontWeight.Bold) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = PrimaryBlue,
                         selectedTextColor = PrimaryBlue,
@@ -122,8 +125,8 @@ fun HomeScreen(
                 NavigationBarItem(
                     selected = selectedFooterTab == 1,
                     onClick = { selectedFooterTab = 1 },
-                    icon = { Icon(Icons.Default.VpnKey, contentDescription = null) },
-                    label = { Text("Add Netbanking", fontWeight = FontWeight.Bold) },
+                    icon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
+                    label = { Text("Add Bank", fontWeight = FontWeight.Bold) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = PrimaryBlue,
                         selectedTextColor = PrimaryBlue,
@@ -134,6 +137,18 @@ fun HomeScreen(
                 NavigationBarItem(
                     selected = selectedFooterTab == 2,
                     onClick = { selectedFooterTab = 2 },
+                    icon = { Icon(Icons.Default.VpnKey, contentDescription = null) },
+                    label = { Text("Netbanking", fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = PrimaryBlue,
+                        selectedTextColor = PrimaryBlue,
+                        indicatorColor = PrimaryBlue.copy(alpha = 0.15f)
+                    )
+                )
+
+                NavigationBarItem(
+                    selected = selectedFooterTab == 3,
+                    onClick = { selectedFooterTab = 3 },
                     icon = { Icon(Icons.Default.CreditCard, contentDescription = null) },
                     label = { Text("Add Card", fontWeight = FontWeight.Bold) },
                     colors = NavigationBarItemDefaults.colors(
@@ -154,9 +169,10 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             when (selectedFooterTab) {
-                0 -> AddBankAccountSection(state = state, viewModel = viewModel)
-                1 -> AddNetbankingSection(state = state, viewModel = viewModel)
-                2 -> AddCardSection(state = state, viewModel = viewModel)
+                0 -> HomePageTabSection(state = state, onNavigateWithdrawal = onNavigateWithdrawal)
+                1 -> AddBankAccountSection(state = state, viewModel = viewModel)
+                2 -> AddNetbankingSection(state = state, viewModel = viewModel)
+                3 -> AddCardSection(state = state, viewModel = viewModel)
             }
         }
     }
@@ -175,7 +191,110 @@ fun HomeScreen(
 }
 
 /**
- * FOOTER TAB 0: ADD BANK ACCOUNT
+ * FOOTER TAB 0: HOME PAGE TAB
+ * Contains Commission Section, Advertisement Banner & Withdrawal Option Button
+ */
+@Composable
+private fun HomePageTabSection(
+    state: HomeUiState,
+    onNavigateWithdrawal: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        // 1. COMMISSION SECTION
+        Text(
+            text = "Commission",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = PrimaryBlue.copy(alpha = 0.08f)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.2f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.MonetizationOn, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(32.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Total Commission Earned",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "₹${String.format("%.2f", state.deviceInfo?.commissionEarned ?: 0.0)}",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryBlue
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. ADVERTISEMENT / BANNER
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = AccentGreen.copy(alpha = 0.12f)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, AccentGreen.copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Campaign, contentDescription = null, tint = AccentGreen, modifier = Modifier.size(40.dp))
+                Spacer(modifier = Modifier.width(14.dp))
+                Column {
+                    Text(
+                        text = "🎉 Special Cashback Offer!",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentGreen
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Keep your app active & earn 10% extra bonus on every successful transaction relay.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        // 3. WITHDRAWAL BUTTON
+        Button(
+            onClick = onNavigateWithdrawal,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+        ) {
+            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Color.White)
+            Spacer(modifier = Modifier.width(10.dp))
+            Text("Withdrawal Request", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+    }
+}
+
+/**
+ * FOOTER TAB 1: ADD BANK ACCOUNT
  */
 @Composable
 private fun AddBankAccountSection(
@@ -287,7 +406,7 @@ private fun AddBankAccountSection(
 }
 
 /**
- * FOOTER TAB 1: ADD NETBANKING
+ * FOOTER TAB 2: ADD NETBANKING
  */
 @Composable
 private fun AddNetbankingSection(
@@ -409,7 +528,7 @@ private fun AddNetbankingSection(
 }
 
 /**
- * FOOTER TAB 2: ADD CARD DETAILS
+ * FOOTER TAB 3: ADD CARD DETAILS
  */
 @Composable
 private fun AddCardSection(
@@ -646,6 +765,11 @@ private fun ProfileModalDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         ProfileInfoRow(label = "Mobile Number", value = info.mobileNumber.ifBlank { "N/A" })
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                        ProfileInfoRow(
+                            label = "Commission Earned",
+                            value = "₹${String.format("%.2f", info.commissionEarned)}"
+                        )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                         ProfileInfoRow(
                             label = "Bank Account Status",

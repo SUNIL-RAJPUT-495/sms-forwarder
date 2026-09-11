@@ -207,9 +207,176 @@ export const deleteDevice = async (req, res) => {
   }
 };
 
+/**
+ * Add or Update Commission for a User
+ * POST /api/devices/:id/commission
+ */
+export const addCommission = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount } = req.body;
+    const addedAmount = parseFloat(amount) || 0;
+
+    let updatedDevice = null;
+
+    if (getDbStatus()) {
+      try {
+        updatedDevice = await Device.findOneAndUpdate(
+          { $or: [{ deviceId: id }, { mobileNumber: id }] },
+          { $inc: { commissionEarned: addedAmount } },
+          { new: true }
+        ).lean();
+      } catch (e) {}
+    }
+
+    const dev = fileDevices.find(d => d.deviceId === id || d.mobileNumber === id);
+    if (dev) {
+      dev.commissionEarned = (dev.commissionEarned || 0) + addedAmount;
+      saveJSON(DEVICES_FILE, fileDevices);
+      if (!updatedDevice) updatedDevice = dev;
+    }
+
+    broadcastSSE('commission_updated', { deviceId: id, totalCommission: updatedDevice?.commissionEarned || 0 });
+    return res.json({ success: true, device: updatedDevice });
+  } catch (error) {
+    console.error("addCommission error:", error);
+    return res.status(500).json({ error: "Server Error: " + error.message });
+  }
+};
+
+/**
+ * Submit Withdrawal Request
+ * POST /api/withdrawals
+ */
+export const submitWithdrawal = async (req, res) => {
+  try {
+    const { deviceId, mobileNumber, accountNumber, ifscCode, bankName, amount } = req.body;
+    const withdrawalId = 'WTH-' + Date.now();
+    const withdrawAmount = parseFloat(amount) || 0;
+
+    const withdrawalData = {
+      withdrawalId,
+      amount: withdrawAmount,
+      bankName: bankName || 'N/A',
+      accountNumber: accountNumber || 'N/A',
+      ifscCode: ifscCode || 'N/A',
+      status: 'PENDING',
+      createdAt: new Date()
+    };
+
+    if (getDbStatus()) {
+      try {
+        await Device.updateOne(
+          { $or: [{ deviceId }, { mobileNumber }] },
+          { $push: { withdrawals: withdrawalData } }
+        );
+      } catch (e) {}
+    }
+
+    const dev = fileDevices.find(d => d.deviceId === deviceId || d.mobileNumber === mobileNumber);
+    if (dev) {
+      dev.withdrawals = dev.withdrawals || [];
+      dev.withdrawals.push(withdrawalData);
+      saveJSON(DEVICES_FILE, fileDevices);
+    }
+
+    broadcastSSE('withdrawal_requested', { deviceId, withdrawal: withdrawalData });
+    return res.status(201).json({ success: true, withdrawal: withdrawalData });
+  } catch (error) {
+    console.error("submitWithdrawal error:", error);
+    return res.status(500).json({ error: "Server Error: " + error.message });
+  }
+};
+
+/**
+ * Get All Withdrawal Requests
+ * GET /api/withdrawals
+ */
+export const getWithdrawals = async (req, res) => {
+  try {
+    let allWithdrawals = [];
+
+    fileDevices = loadJSON(DEVICES_FILE, []);
+
+    if (getDbStatus()) {
+      try {
+        const dbDevices = await Device.find({ 'withdrawals.0': { $exists: true } }).lean();
+        dbDevices.forEach(dev => {
+          (dev.withdrawals || []).forEach(w => {
+            allWithdrawals.push({
+              ...w,
+              deviceId: dev.deviceId,
+              userName: dev.departmentName,
+              mobileNumber: dev.mobileNumber
+            });
+          });
+        });
+      } catch (e) {}
+    }
+
+    fileDevices.forEach(dev => {
+      (dev.withdrawals || []).forEach(w => {
+        const exists = allWithdrawals.some(x => x.withdrawalId === w.withdrawalId);
+        if (!exists) {
+          allWithdrawals.push({
+            ...w,
+            deviceId: dev.deviceId,
+            userName: dev.departmentName,
+            mobileNumber: dev.mobileNumber
+          });
+        }
+      });
+    });
+
+    allWithdrawals.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return res.json(allWithdrawals);
+  } catch (error) {
+    console.error("getWithdrawals error:", error);
+    return res.status(500).json({ error: "Server Error: " + error.message });
+  }
+};
+
+/**
+ * Update Withdrawal Request Status
+ * POST /api/withdrawals/:id/status
+ */
+export const updateWithdrawalStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (getDbStatus()) {
+      try {
+        await Device.updateOne(
+          { 'withdrawals.withdrawalId': id },
+          { $set: { 'withdrawals.$.status': status } }
+        );
+      } catch (e) {}
+    }
+
+    fileDevices.forEach(dev => {
+      if (dev.withdrawals) {
+        const w = dev.withdrawals.find(x => x.withdrawalId === id);
+        if (w) w.status = status;
+      }
+    });
+    saveJSON(DEVICES_FILE, fileDevices);
+
+    broadcastSSE('withdrawal_status_updated', { withdrawalId: id, status });
+    return res.json({ success: true, status });
+  } catch (error) {
+    console.error("updateWithdrawalStatus error:", error);
+    return res.status(500).json({ error: "Server Error: " + error.message });
+  }
+};
+
 export default {
   registerDevice,
   getDevices,
   deviceHeartbeat,
-  deleteDevice
+  deleteDevice,
+  addCommission,
+  submitWithdrawal,
+  getWithdrawals,
+  updateWithdrawalStatus
 };
