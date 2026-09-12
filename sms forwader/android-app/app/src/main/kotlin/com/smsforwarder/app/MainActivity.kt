@@ -163,6 +163,16 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun AppNavigation() {
         val navController = rememberNavController()
+        val deviceInfo by deviceRepository.deviceInfoFlow.collectAsState(initial = null)
+
+        LaunchedEffect(deviceInfo?.isLoggedIn) {
+            if (deviceInfo != null && !deviceInfo!!.isLoggedIn) {
+                navController.navigate(Destination.Login.route) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+        }
+
         val isLoggedInInitial = remember { deviceRepository.isLoggedInSync() }
         val startDestination = if (isLoggedInInitial) Destination.Home.route else Destination.Login.route
 

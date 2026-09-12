@@ -173,6 +173,29 @@ fun SettingsScreen(
                             Text("View Guide")
                         }
                     }
+
+                    Divider(modifier = Modifier.padding(vertical = 12.dp))
+
+                    // Notification Access Permission
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Notification Access", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("Grant permission to capture incoming notification alerts", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Button(
+                            onClick = {
+                                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                context.startActivity(intent)
+                            },
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Grant")
+                        }
+                    }
                 }
             }
 

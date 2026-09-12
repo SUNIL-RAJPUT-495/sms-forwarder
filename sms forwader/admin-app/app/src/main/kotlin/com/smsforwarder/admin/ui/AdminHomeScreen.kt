@@ -563,6 +563,7 @@ private fun CommissionManagementSection(
     var searchQuery by remember { mutableStateOf("") }
     var amountInput by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     val focusManager = LocalFocusManager.current
 
@@ -650,24 +651,31 @@ private fun CommissionManagementSection(
 
                             Button(
                                 onClick = {
+                                    if (isSubmitting) return@Button
                                     focusManager.clearFocus()
                                     val amt = amountInput.toDoubleOrNull() ?: 0.0
                                     if (amt > 0) {
+                                        isSubmitting = true
                                         viewModel.addCommissionToUser(dev.deviceId, amt) {
+                                            isSubmitting = false
                                             val msgStr = "✅ Added ₹$amt Commission to ${dev.departmentName}!"
-                                            message = msgStr
-                                            Toast.makeText(context, msgStr, Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, msgStr, Toast.LENGTH_LONG).show()
                                             amountInput = ""
+                                            selectedUser = null
                                         }
                                     }
                                 },
-                                enabled = (amountInput.toDoubleOrNull() ?: 0.0) > 0,
+                                enabled = !isSubmitting && (amountInput.toDoubleOrNull() ?: 0.0) > 0,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("Add Commission Amount", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                if (isSubmitting) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                                } else {
+                                    Text("Add Commission Amount", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }

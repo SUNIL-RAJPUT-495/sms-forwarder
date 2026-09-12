@@ -248,6 +248,12 @@ class DeviceRepository @Inject constructor(
                         if (myDevice.deviceId.isNotBlank()) p[KEY_DEVICE_ID] = myDevice.deviceId
                         p[KEY_COMMISSION_EARNED] = myDevice.commissionEarned
                     }
+                } else {
+                    // User was deleted from MongoDB/server -> force logout and redirect to login
+                    val currentIsLoggedIn = prefs[KEY_IS_LOGGED_IN] ?: false
+                    if (currentIsLoggedIn && currentMobile.isNotBlank() && currentMobile != "N/A") {
+                        logoutUser()
+                    }
                 }
             }
         }
